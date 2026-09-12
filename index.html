@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Daily Log" />
 <meta name="theme-color" content="#0f766e" />
-<meta name="app-build" content="20260912-1636" />
+<meta name="app-build" content="20260912-1641" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -479,6 +479,19 @@
   }
 
   /* ---- Analysis screen ---- */
+  .analysis-group-title{
+    font-size:15px;
+    font-weight:700;
+    color:var(--on-surface);
+    margin:1.75rem 0.25rem 0.15rem;
+  }
+  .analysis-group-title:first-of-type{ margin-top:0; }
+  .analysis-group-desc{
+    font-size:11px;
+    line-height:1.5;
+    color:var(--on-surface-variant);
+    margin:0 0.25rem 0.85rem;
+  }
   .stat-tiles{
     display:grid;
     grid-template-columns:repeat(2, 1fr);
@@ -919,6 +932,9 @@
         <p class="subtitle">気分の浮き沈みの傾向</p>
       </header>
 
+      <div class="analysis-group-title">コンディション</div>
+      <p class="analysis-group-desc">気分・不安そのものの記録と推移です。</p>
+
       <div class="stat-tiles">
         <div class="stat-tile">
           <div class="label">平均気分</div>
@@ -978,46 +994,52 @@
         </div>
       </div>
 
-      <!-- ===== 記録（自慰行為）とのつきあわせ分析 — 折りたたみ ===== -->
+      <!-- ===== 自慰行為との関連分析 — 折りたたみ ===== -->
+
+      <div class="analysis-group-title">自慰行為との関連</div>
+      <p class="analysis-group-desc">自慰行為の記録と、気分・不安の関係を比較します。因果関係を断定するものではありません。</p>
 
       <details class="rec-section" id="recFreqSection">
-        <summary>記録の頻度<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <summary>自慰行為の頻度<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
         <div class="rec-section-body" id="recFreqBody"></div>
       </details>
 
       <details class="rec-section" id="recAroundSection">
-        <summary>記録の前後<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <summary>自慰行為の前後<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
         <div class="rec-section-body" id="recAroundBody"></div>
       </details>
 
       <details class="rec-section" id="recDaySection">
-        <summary>記録があった日／なかった日<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <summary>自慰行為があった日／なかった日<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
         <div class="rec-section-body" id="recDayBody"></div>
       </details>
 
       <details class="rec-section" id="recNextDaySection">
-        <summary>翌日の状態<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <summary>自慰行為をした翌日の状態<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
         <div class="rec-section-body" id="recNextDayBody"></div>
       </details>
 
       <details class="rec-section" id="recFrequencyBucketSection">
-        <summary>頻度と気分・不安<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <summary>自慰行為の頻度と気分・不安<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
         <div class="rec-section-body" id="recFrequencyBucketBody"></div>
       </details>
 
       <details class="rec-section" id="recTodSection">
-        <summary>記録の時間帯<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <summary>自慰行為の時間帯<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
         <div class="rec-section-body" id="recTodBody"></div>
       </details>
+
+      <details class="rec-section" id="recCommentSection" open>
+        <summary>自慰行為との関連コメント<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+        <div class="rec-section-body" id="recCommentBody"></div>
+      </details>
+
+      <div class="analysis-group-title">メモの傾向</div>
+      <p class="analysis-group-desc">ひとことメモの内容から見えるテーマの傾向です。</p>
 
       <details class="rec-section" id="memoAnalysisSection">
         <summary>メモから見える傾向<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
         <div class="rec-section-body" id="memoAnalysisBody"></div>
-      </details>
-
-      <details class="rec-section" id="recCommentSection" open>
-        <summary>傾向コメント<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-        <div class="rec-section-body" id="recCommentBody"></div>
       </details>
 
       <button class="reset-link" id="resetAllBtn">すべてのデータを削除</button>
@@ -2043,7 +2065,7 @@
   }
 
   /* =====================================================================
-     記録（自慰行為）とのつきあわせ分析 — Part B
+     自慰行為（records）とのつきあわせ分析 — Part B
      Every comparison here only renders once its groups clear MIN_SAMPLE
      (5, per spec); below that it shows a "not enough data yet" note
      instead of a misleading small-N average. Nothing here claims
@@ -2088,7 +2110,7 @@
   function renderRecFrequency(){
     const body = document.getElementById('recFreqBody');
     if (records.length === 0){
-      body.innerHTML = '<p class="note">まだ記録がありません。</p>';
+      body.innerHTML = '<p class="note">まだ自慰行為の記録がありません。</p>';
       return;
     }
     const f = computeRecFrequency();
@@ -2214,8 +2236,8 @@
     }
     const cols = document.createElement('div');
     cols.className = 'day-compare-cols';
-    cols.appendChild(buildDayCompareCol('記録ありの日', withDays));
-    cols.appendChild(buildDayCompareCol('記録なしの日', withoutDays));
+    cols.appendChild(buildDayCompareCol('自慰行為ありの日', withDays));
+    cols.appendChild(buildDayCompareCol('自慰行為なしの日', withoutDays));
     body.appendChild(cols);
     const p = document.createElement('p');
     p.className = 'note';
@@ -2244,7 +2266,7 @@
     }
     const cols = document.createElement('div');
     cols.className = 'day-compare-cols';
-    cols.appendChild(buildDayCompareCol('記録をした翌日', nextDayGroup));
+    cols.appendChild(buildDayCompareCol('自慰行為をした翌日', nextDayGroup));
     cols.appendChild(buildDayCompareCol('その他の日', otherGroup));
     body.appendChild(cols);
   }
@@ -2310,7 +2332,7 @@
     const body = document.getElementById('recTodBody');
     body.innerHTML = '';
     if (records.length === 0){
-      body.innerHTML = '<p class="note">まだ記録がありません。</p>';
+      body.innerHTML = '<p class="note">まだ自慰行為の記録がありません。</p>';
       return;
     }
     const rows = document.createElement('div');
@@ -2349,11 +2371,11 @@
       const { before, after } = collectAroundWindows(3);
       if (before.mood.length >= MIN_SAMPLE && after.mood.length >= MIN_SAMPLE){
         const d = mean(after.mood) - mean(before.mood);
-        if (Math.abs(d) >= 0.3) comments.push(`記録上、記録後3時間以内は平均気分が${Math.abs(d).toFixed(1)}${d>0?'高く':'低く'}なっています。`);
+        if (Math.abs(d) >= 0.3) comments.push(`記録上、自慰行為後3時間以内は平均気分が${Math.abs(d).toFixed(1)}${d>0?'高く':'低く'}なっています。`);
       }
       if (before.anxiety.length >= MIN_SAMPLE && after.anxiety.length >= MIN_SAMPLE){
         const d = mean(after.anxiety) - mean(before.anxiety);
-        if (Math.abs(d) >= 0.3) comments.push(`記録上、記録後3時間以内は平均不安が${Math.abs(d).toFixed(1)}${d<0?'低く':'高く'}なっています。`);
+        if (Math.abs(d) >= 0.3) comments.push(`記録上、自慰行為後3時間以内は平均不安が${Math.abs(d).toFixed(1)}${d<0?'低く':'高く'}なっています。`);
       }
     }
 
@@ -2362,7 +2384,7 @@
       const total = counts.reduce((a,b)=>a+b,0);
       const maxIdx = counts.indexOf(Math.max(...counts));
       if (total > 0 && counts[maxIdx] / total >= 0.4){
-        comments.push(`記録上、${REC_TOD_BUCKETS[maxIdx].key}に記録が多い傾向があります。`);
+        comments.push(`記録上、${REC_TOD_BUCKETS[maxIdx].key}に自慰行為が多い傾向があります。`);
       }
     }
 
@@ -2381,7 +2403,7 @@
     }
 
     if (comments.length === 0){
-      body.innerHTML = '<p class="note">記録が増えると、ここに傾向コメントが表示されます。</p>';
+      body.innerHTML = '<p class="note">自慰行為の記録が増えると、ここに傾向コメントが表示されます。</p>';
       return;
     }
     const list = document.createElement('div');
@@ -2544,14 +2566,14 @@
 
     if (records.length >= MIN_SAMPLE){
       const { before, after } = collectAroundMemoWindows(3);
-      appendThemeShareBlock(body, '記録前3時間に多いテーマ', before);
-      appendThemeShareBlock(body, '記録後3時間に多いテーマ', after);
+      appendThemeShareBlock(body, '自慰行為前3時間に多いテーマ', before);
+      appendThemeShareBlock(body, '自慰行為後3時間に多いテーマ', after);
     }
   }
 
   /* ---------------- reset (this device only — data lives in localStorage) ---------------- */
   document.getElementById('resetAllBtn').addEventListener('click', () => {
-    if (confirm('この端末に保存されている「記録」と「気分」のデータをすべて削除します。元に戻せません。よろしいですか？')){
+    if (confirm('この端末に保存されている「自慰行為」と「気分」のデータをすべて削除します。元に戻せません。よろしいですか？')){
       localStorage.removeItem(RECORDS_KEY);
       localStorage.removeItem(MOODS_KEY);
       records = [];
