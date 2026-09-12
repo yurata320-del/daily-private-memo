@@ -367,6 +367,21 @@
     font-size:10px;
     fill:var(--on-surface-variant);
   }
+  .reset-link{
+    display:block;
+    width:100%;
+    margin:0.5rem 0 0;
+    padding:0.6rem;
+    background:transparent;
+    border:none;
+    color:var(--on-surface-variant);
+    font-family:inherit;
+    font-size:12px;
+    text-decoration:underline;
+    text-align:center;
+    cursor:pointer;
+  }
+  .reset-link:hover{ color:var(--error); }
 
   /* ---- Bottom nav ---- */
   .bottom-nav{
@@ -525,6 +540,8 @@
         </div>
         <svg class="chart-svg" id="timeOfDaySvg" viewBox="0 0 320 130" preserveAspectRatio="none"></svg>
       </div>
+
+      <button class="reset-link" id="resetAllBtn">すべてのデータを削除</button>
     </section>
 
   </div>
@@ -1188,6 +1205,20 @@
       timeOfDaySvg.appendChild(valueLabel);
     });
   }
+
+  /* ---------------- reset (this device only — data lives in localStorage) ---------------- */
+  document.getElementById('resetAllBtn').addEventListener('click', () => {
+    if (confirm('この端末に保存されている「記録」と「気分」のデータをすべて削除します。元に戻せません。よろしいですか？')){
+      localStorage.removeItem(RECORDS_KEY);
+      localStorage.removeItem(MOODS_KEY);
+      records = [];
+      moods = [];
+      renderRecord();
+      renderMoodHistory();
+      renderMoodDay();
+      renderAnalysis();
+    }
+  });
 
   /* ---------------- init ---------------- */
   renderRecord();
