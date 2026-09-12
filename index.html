@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Daily Log" />
 <meta name="theme-color" content="#0f766e" />
-<meta name="app-build" content="20260912-1713" />
+<meta name="app-build" content="20260912-1716" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -259,50 +259,55 @@
     padding:1.5rem 1rem 1.25rem;
     margin-bottom:1.5rem;
   }
-  /* One tap on a row = saved immediately, same as the old dot row. */
-  /* Wraps to as many rows as needed — every chip is visible at once,
-     no swipe/scroll required. Each chip's own content (digit + label)
-     stays on a single line. */
+  /* One tap on a chip = saved immediately, same as the old dot row.
+     Labels run vertically (tategaki) so each chip stays narrow
+     regardless of label length — that's what lets every option (7 for
+     mood, 5 for anxiety) sit in a single row with no wrap and no
+     scroll. */
   .choice-list{
     display:flex;
     flex-direction:row;
-    flex-wrap:wrap;
-    gap:0.45rem;
+    flex-wrap:nowrap;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:0.3rem;
   }
   .choice-row{
     appearance:none;
     border:none;
     cursor:pointer;
-    flex:0 0 auto;
+    flex:1 1 0;
+    min-width:0;
     display:flex;
-    flex-direction:row;
+    flex-direction:column;
     align-items:center;
     gap:0.4rem;
-    padding:0.4rem 0.85rem 0.4rem 0.4rem;
-    border-radius:9999px;
+    padding:0.55rem 0.2rem 0.6rem;
+    border-radius:1.2rem;
     background:var(--surface-container);
     font-family:inherit;
-    white-space:nowrap;
     transition:transform 0.08s ease;
   }
   .choice-row:active{ transform:scale(0.96); }
   .choice-row.selected{ box-shadow:0 0 0 2px var(--primary) inset; }
   .choice-badge{
     flex:0 0 auto;
-    width:28px;
-    height:28px;
+    width:26px;
+    height:26px;
     border-radius:9999px;
     display:flex;
     align-items:center;
     justify-content:center;
-    font-size:13px;
+    font-size:12px;
     font-weight:700;
   }
   .choice-label{
-    font-size:13px;
+    writing-mode:vertical-rl;
+    text-orientation:upright;
+    font-size:11px;
+    letter-spacing:0.05em;
     font-weight:500;
     color:var(--on-surface);
-    white-space:nowrap;
   }
   .mood-toast{
     text-align:center;
