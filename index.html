@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Daily Log" />
 <meta name="theme-color" content="#0f766e" />
-<meta name="app-build" content="20260912-1641" />
+<meta name="app-build" content="20260912-1657" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -580,6 +580,107 @@
     box-shadow:0 4px 10px rgba(15,118,110,0.28);
   }
 
+  /* ---- Analysis: results-first layout ---- */
+  .recent-card{
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    box-shadow:var(--glass-shadow);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    border-radius:1.75rem;
+    padding:1.3rem 1.2rem;
+    margin-bottom:1.5rem;
+  }
+  .recent-card-title{
+    font-size:13px;
+    font-weight:600;
+    color:var(--on-surface-variant);
+    margin-bottom:0.9rem;
+  }
+  .recent-metrics{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:0.75rem;
+    margin-bottom:0.9rem;
+  }
+  .recent-metric{ text-align:center; }
+  .recent-metric .label{ font-size:12px; color:var(--on-surface-variant); margin-bottom:0.15rem; }
+  .recent-metric .value{ font-size:28px; font-weight:700; color:var(--on-surface); letter-spacing:-0.02em; font-variant-numeric:tabular-nums; }
+  .recent-metric .delta{ font-size:12px; margin-top:0.2rem; color:var(--on-surface-variant); }
+  .recent-metric .delta.favorable{ color:var(--primary); font-weight:600; }
+  .recent-metric .delta.unfavorable{ color:var(--error); font-weight:600; }
+  .recent-summary{
+    font-size:14px;
+    line-height:1.6;
+    font-weight:500;
+    color:var(--on-surface);
+    margin:0 0 0.4rem;
+  }
+  .recent-aside{
+    font-size:11px;
+    color:var(--on-surface-variant);
+    margin:0;
+  }
+
+  .findings-list{
+    display:flex;
+    flex-direction:column;
+    gap:0.6rem;
+    margin-bottom:1.5rem;
+  }
+  .finding-item{
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    box-shadow:var(--glass-shadow);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    border-radius:1.25rem;
+    padding:0.9rem 1rem;
+    display:flex;
+    gap:0.7rem;
+    align-items:flex-start;
+  }
+  .finding-item .rank{
+    flex:0 0 auto;
+    width:22px;
+    height:22px;
+    border-radius:9999px;
+    background:linear-gradient(135deg, var(--accent-a), var(--accent-b));
+    color:#ffffff;
+    font-size:11px;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-top:0.1rem;
+  }
+  .finding-item .headline{ font-size:14px; font-weight:600; color:var(--on-surface); margin-bottom:0.25rem; }
+  .finding-item .detail{ font-size:12px; color:var(--on-surface-variant); line-height:1.5; }
+  .findings-empty{
+    font-size:13px;
+    color:var(--on-surface-variant);
+    padding:0.9rem 0.25rem 1.5rem;
+  }
+
+  .insight-card.tight{ margin-bottom:0.5rem; }
+  .detail-toggle{
+    display:block;
+    margin:0 0 1.5rem;
+    padding:0.4rem 0.25rem;
+    background:transparent;
+    border:none;
+    color:var(--primary);
+    font-family:inherit;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .detail-area{ margin-bottom:1.5rem; }
+  .detail-area[hidden]{ display:none; }
+  .rec-summary-line{ font-size:13px; color:var(--on-surface); line-height:1.6; }
+  .rec-summary-line strong{ font-weight:700; }
+  .rec-summary-text{ margin:0.6rem 0 0; font-size:13px; color:var(--on-surface-variant); line-height:1.6; }
+
   .sub-chart{ margin-top:1rem; }
   .sub-chart .sub-chart-title{
     font-size:12px;
@@ -929,44 +1030,26 @@
     <section class="screen" id="screen-analysis" hidden>
       <header>
         <h1>分析</h1>
-        <p class="subtitle">気分の浮き沈みの傾向</p>
+        <p class="subtitle">最近の自分の状態</p>
       </header>
 
-      <div class="analysis-group-title">コンディション</div>
-      <p class="analysis-group-desc">気分・不安そのものの記録と推移です。</p>
-
-      <div class="stat-tiles">
-        <div class="stat-tile">
-          <div class="label">平均気分</div>
-          <div class="value" id="statAvg">–</div>
-        </div>
-        <div class="stat-tile">
-          <div class="label">平均不安</div>
-          <div class="value" id="statAnxietyAvg">–</div>
-        </div>
-        <div class="stat-tile">
-          <div class="label">記録数</div>
-          <div class="value" id="statCount">–</div>
-        </div>
-        <div class="stat-tile">
-          <div class="label">気分の変動</div>
-          <div class="value" id="statVolatility">–</div>
-        </div>
+      <!-- 1. 最近7日間 -->
+      <div class="recent-card">
+        <div class="recent-card-title">最近7日間</div>
+        <div class="recent-metrics" id="recentMetrics"></div>
+        <p class="recent-summary" id="recentSummary"></p>
+        <p class="recent-aside" id="recentAside"></p>
       </div>
 
-      <div class="insight-card" id="insightCard">記録が増えると、傾向が見えてきます。</div>
-      <div class="insight-card" id="anxietyInsightCard" hidden></div>
-
+      <!-- 2. コンディションの推移 -->
       <div class="chart-card">
         <div class="section-header">
-          <h2>推移</h2>
-          <span class="count" id="trendRangeLabel"></span>
+          <h2>コンディションの推移</h2>
         </div>
-        <div class="granularity-toggle" id="trendGranularityToggle">
-          <button data-granularity="day" class="active">日</button>
-          <button data-granularity="week">週</button>
-          <button data-granularity="month">月</button>
-          <button data-granularity="year">年</button>
+        <div class="granularity-toggle" id="trendWindowToggle">
+          <button type="button" data-window="7" class="active">7日</button>
+          <button type="button" data-window="30">30日</button>
+          <button type="button" data-window="90">90日</button>
         </div>
         <div class="sub-chart">
           <div class="sub-chart-title">気分（0〜6）</div>
@@ -980,67 +1063,44 @@
         </div>
       </div>
 
-      <div class="chart-card">
-        <div class="section-header">
-          <h2>時間帯別の傾向</h2>
-        </div>
-        <div class="sub-chart">
-          <div class="sub-chart-title">気分（0〜6）</div>
-          <svg class="chart-svg" id="timeOfDaySvg" viewBox="0 0 320 130" preserveAspectRatio="none"></svg>
-        </div>
-        <div class="sub-chart">
-          <div class="sub-chart-title">不安（0〜4）</div>
-          <svg class="chart-svg" id="anxietyTimeOfDaySvg" viewBox="0 0 320 130" preserveAspectRatio="none"></svg>
-        </div>
+      <!-- 3. 最近の傾向 — 内部分析の中から重要度の高い上位3件だけ -->
+      <div class="section-header"><h2>最近の傾向</h2></div>
+      <div class="findings-list" id="findingsList"></div>
+
+      <!-- 4. 自慰行為との関連 — 1セクションに集約、詳細は折りたたみ -->
+      <div class="section-header"><h2>自慰行為との関連</h2></div>
+      <div class="insight-card tight" id="recSummaryBody"></div>
+      <button class="detail-toggle" id="recDetailToggle" type="button">詳しく見る</button>
+      <div class="detail-area" id="recDetailArea" hidden>
+        <details class="rec-section" id="recFreqSection">
+          <summary>自慰行為の頻度<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="rec-section-body" id="recFreqBody"></div>
+        </details>
+        <details class="rec-section" id="recDaySection">
+          <summary>自慰行為があった日／なかった日<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="rec-section-body" id="recDayBody"></div>
+        </details>
+        <details class="rec-section" id="recNextDaySection">
+          <summary>自慰行為をした翌日の状態<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="rec-section-body" id="recNextDayBody"></div>
+        </details>
+        <details class="rec-section" id="recFrequencyBucketSection">
+          <summary>自慰行為の頻度と気分・不安<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="rec-section-body" id="recFrequencyBucketBody"></div>
+        </details>
+        <details class="rec-section" id="recTodSection">
+          <summary>自慰行為の時間帯<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="rec-section-body" id="recTodBody"></div>
+        </details>
       </div>
 
-      <!-- ===== 自慰行為との関連分析 — 折りたたみ ===== -->
-
-      <div class="analysis-group-title">自慰行為との関連</div>
-      <p class="analysis-group-desc">自慰行為の記録と、気分・不安の関係を比較します。因果関係を断定するものではありません。</p>
-
-      <details class="rec-section" id="recFreqSection">
-        <summary>自慰行為の頻度<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-        <div class="rec-section-body" id="recFreqBody"></div>
-      </details>
-
-      <details class="rec-section" id="recAroundSection">
-        <summary>自慰行為の前後<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-        <div class="rec-section-body" id="recAroundBody"></div>
-      </details>
-
-      <details class="rec-section" id="recDaySection">
-        <summary>自慰行為があった日／なかった日<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-        <div class="rec-section-body" id="recDayBody"></div>
-      </details>
-
-      <details class="rec-section" id="recNextDaySection">
-        <summary>自慰行為をした翌日の状態<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-        <div class="rec-section-body" id="recNextDayBody"></div>
-      </details>
-
-      <details class="rec-section" id="recFrequencyBucketSection">
-        <summary>自慰行為の頻度と気分・不安<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-        <div class="rec-section-body" id="recFrequencyBucketBody"></div>
-      </details>
-
-      <details class="rec-section" id="recTodSection">
-        <summary>自慰行為の時間帯<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-        <div class="rec-section-body" id="recTodBody"></div>
-      </details>
-
-      <details class="rec-section" id="recCommentSection" open>
-        <summary>自慰行為との関連コメント<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-        <div class="rec-section-body" id="recCommentBody"></div>
-      </details>
-
-      <div class="analysis-group-title">メモの傾向</div>
-      <p class="analysis-group-desc">ひとことメモの内容から見えるテーマの傾向です。</p>
-
-      <details class="rec-section" id="memoAnalysisSection">
-        <summary>メモから見える傾向<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+      <!-- 5. メモから見えること -->
+      <div class="section-header"><h2>メモから見えること</h2></div>
+      <div class="insight-card tight" id="memoSummaryBody"></div>
+      <button class="detail-toggle" id="memoDetailToggle" type="button">詳しく見る</button>
+      <div class="detail-area" id="memoDetailArea" hidden>
         <div class="rec-section-body" id="memoAnalysisBody"></div>
-      </details>
+      </div>
 
       <button class="reset-link" id="resetAllBtn">すべてのデータを削除</button>
     </section>
@@ -1614,21 +1674,23 @@
   }
 
   /* ---------------- analysis tab ---------------- */
-  const statAvgEl = document.getElementById('statAvg');
-  const statAnxietyAvgEl = document.getElementById('statAnxietyAvg');
-  const statCountEl = document.getElementById('statCount');
-  const statVolatilityEl = document.getElementById('statVolatility');
-  const insightCardEl = document.getElementById('insightCard');
-  const anxietyInsightCardEl = document.getElementById('anxietyInsightCard');
-  const trendRangeLabelEl = document.getElementById('trendRangeLabel');
   const analysisSvg = document.getElementById('analysisSvg');
   const analysisTooltip = document.getElementById('analysisTooltip');
   const anxietyTrendSvg = document.getElementById('anxietyTrendSvg');
   const anxietyTrendTooltip = document.getElementById('anxietyTrendTooltip');
-  const timeOfDaySvg = document.getElementById('timeOfDaySvg');
-  const anxietyTimeOfDaySvg = document.getElementById('anxietyTimeOfDaySvg');
-  const trendToggleEl = document.getElementById('trendGranularityToggle');
-  const MIN_SAMPLE = 5; // general "enough data to show a trend" floor, per spec
+  const trendWindowToggleEl = document.getElementById('trendWindowToggle');
+  const recentMetricsEl = document.getElementById('recentMetrics');
+  const recentSummaryEl = document.getElementById('recentSummary');
+  const recentAsideEl = document.getElementById('recentAside');
+  const findingsListEl = document.getElementById('findingsList');
+  const recSummaryBodyEl = document.getElementById('recSummaryBody');
+  const memoSummaryBodyEl = document.getElementById('memoSummaryBody');
+  const recDetailToggleEl = document.getElementById('recDetailToggle');
+  const recDetailAreaEl = document.getElementById('recDetailArea');
+  const memoDetailToggleEl = document.getElementById('memoDetailToggle');
+  const memoDetailAreaEl = document.getElementById('memoDetailArea');
+  const MIN_SAMPLE = 5;       // below this, a comparison isn't shown at all
+  const REFERENCE_SAMPLE = 10; // 5–9: shown but tagged "参考"; 10+: shown normally
 
   function mean(arr){ return arr.reduce((s,v) => s+v, 0) / arr.length; }
   function stdev(arr){
@@ -1639,9 +1701,6 @@
 
   const DAY_MS = 24*60*60*1000;
 
-  /* ---- trend granularity: 日/週/月/年 ---- */
-  let trendGranularity = 'day';
-
   function weekKeyMonday(ts){
     const d = new Date(ts);
     const dow = d.getDay(); // 0=Sun..6=Sat
@@ -1649,183 +1708,402 @@
     const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diffToMonday, 0,0,0,0);
     return localDateStr(monday.getTime());
   }
-  function monthKey(ts){
-    const d = new Date(ts);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+
+  function timeOfDayBucketKey(h){
+    if (h >= 5 && h < 11) return '朝';
+    if (h >= 11 && h < 17) return '昼';
+    if (h >= 17 && h < 21) return '夕方';
+    return '夜';
   }
-  function yearKey(ts){ return String(new Date(ts).getFullYear()); }
 
-  const TREND_CAPS = { day:30, week:20, month:18, year:10 };
-  const TREND_UNIT_LABEL = { day:'日', week:'週', month:'ヶ月', year:'年' };
+  /* ---- コンディションの推移: 7日/30日/90日の固定ウィンドウ（常に日次） ---- */
+  let trendWindowDays = 7;
 
-  function buildTrendPoints(granularity){
-    const keyFn = { day: localDateStr, week: weekKeyMonday, month: monthKey, year: yearKey }[granularity];
+  function buildTrendPoints(windowDays){
+    const cutoff = Date.now() - windowDays*DAY_MS;
     const map = new Map();
     moods.forEach(m => {
-      const key = keyFn(m.ts);
+      if (m.ts < cutoff) return;
+      const key = localDateStr(m.ts);
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(m.level);
     });
     return Array.from(map.entries())
-      .map(([key, lv]) => ({ key, avg: mean(lv), granularity }))
-      .sort((a,b) => a.key.localeCompare(b.key))
-      .slice(-TREND_CAPS[granularity]);
+      .map(([key, lv]) => ({ key, avg: mean(lv) }))
+      .sort((a,b) => a.key.localeCompare(b.key));
   }
 
   function formatTrendLabel(point){
-    const g = point.granularity;
-    if (g === 'day'){
-      const [, m, d] = point.key.split('-').map(Number);
-      return `${m}/${d}`;
-    }
-    if (g === 'week'){
-      const [, m, d] = point.key.split('-').map(Number);
-      return `${m}/${d}週`;
-    }
-    if (g === 'month'){
-      const [y, m] = point.key.split('-').map(Number);
-      return `${y}/${m}`;
-    }
-    return `${point.key}年`;
+    const [, m, d] = point.key.split('-').map(Number);
+    return `${m}/${d}`;
   }
 
-  function buildAlignedAnxietyPoints(moodTrendPoints, granularity){
-    const keyFn = { day: localDateStr, week: weekKeyMonday, month: monthKey, year: yearKey }[granularity];
+  function buildAlignedAnxietyPoints(moodTrendPoints, windowDays){
+    const cutoff = Date.now() - windowDays*DAY_MS;
     const map = new Map();
     moods.forEach(m => {
-      if (!hasAnxiety(m)) return;
-      const key = keyFn(m.ts);
+      if (!hasAnxiety(m) || m.ts < cutoff) return;
+      const key = localDateStr(m.ts);
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(m.anxiety);
     });
     return moodTrendPoints.map(p => ({
-      key: p.key, granularity,
+      key: p.key,
       avg: map.has(p.key) ? mean(map.get(p.key)) : null
     }));
   }
 
   function updateTrendChart(){
-    const trendPoints = buildTrendPoints(trendGranularity);
-    trendRangeLabelEl.textContent = trendPoints.length > 0
-      ? `${trendPoints.length}${TREND_UNIT_LABEL[trendGranularity]}分`
-      : '';
+    const trendPoints = buildTrendPoints(trendWindowDays);
     renderTrendChart(trendPoints);
-    renderAnxietyTrendChart(buildAlignedAnxietyPoints(trendPoints, trendGranularity));
+    renderAnxietyTrendChart(buildAlignedAnxietyPoints(trendPoints, trendWindowDays));
   }
 
-  trendToggleEl.querySelectorAll('button').forEach(btn => {
+  trendWindowToggleEl.querySelectorAll('button').forEach(btn => {
     btn.addEventListener('click', () => {
-      trendGranularity = btn.dataset.granularity;
-      trendToggleEl.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+      trendWindowDays = Number(btn.dataset.window);
+      trendWindowToggleEl.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
       updateTrendChart();
     });
   });
 
-  function renderAnalysis(){
-    if (moods.length === 0){
-      statAvgEl.textContent = '–';
-      statAnxietyAvgEl.textContent = 'データなし';
-      statCountEl.textContent = '0';
-      statVolatilityEl.textContent = '–';
-      insightCardEl.textContent = 'まだ記録がありません。「気分」タブから記録してみましょう。';
-      anxietyInsightCardEl.hidden = true;
-      trendRangeLabelEl.textContent = '';
-      analysisSvg.innerHTML = '';
-      analysisTooltip.classList.add('placeholder');
-      analysisTooltip.textContent = '記録が増えると、ここに推移が表示されます';
-      anxietyTrendSvg.innerHTML = '';
-      anxietyTrendTooltip.classList.add('placeholder');
-      anxietyTrendTooltip.textContent = '記録が増えると、ここに推移が表示されます';
-      timeOfDaySvg.innerHTML = '';
-      anxietyTimeOfDaySvg.innerHTML = '';
-      renderRecFrequency();
-      renderRecAround();
-      renderRecDayCompare();
-      renderRecNextDay();
-      renderRecFrequencyBuckets();
-      renderRecTimeOfDay();
-      renderRecComments();
+  recDetailToggleEl.addEventListener('click', () => {
+    const opening = recDetailAreaEl.hidden;
+    recDetailAreaEl.hidden = !opening;
+    recDetailToggleEl.textContent = opening ? '閉じる' : '詳しく見る';
+  });
+  memoDetailToggleEl.addEventListener('click', () => {
+    const opening = memoDetailAreaEl.hidden;
+    memoDetailAreaEl.hidden = !opening;
+    memoDetailToggleEl.textContent = opening ? '閉じる' : '詳しく見る';
+  });
+
+  /* ---- 1. 最近7日間 ---- */
+  function buildRecentMetric(label, recentVals, priorVals, moodLike){
+    const wrap = document.createElement('div');
+    wrap.className = 'recent-metric';
+    const labelEl = document.createElement('div');
+    labelEl.className = 'label';
+    labelEl.textContent = label;
+    const valueEl = document.createElement('div');
+    valueEl.className = 'value';
+    const deltaEl = document.createElement('div');
+    deltaEl.className = 'delta';
+
+    if (recentVals.length === 0){
+      valueEl.textContent = 'データなし';
+    } else {
+      const avg = mean(recentVals);
+      valueEl.textContent = avg.toFixed(1);
+      if (priorVals.length > 0){
+        const diff = avg - mean(priorVals);
+        if (Math.abs(diff) < 0.3){
+          deltaEl.textContent = '前の7日間と同程度';
+        } else {
+          const favorable = moodLike ? diff > 0 : diff < 0;
+          deltaEl.textContent = `前の7日間より ${diff > 0 ? '+' : ''}${diff.toFixed(1)}`;
+          deltaEl.classList.add(favorable ? 'favorable' : 'unfavorable');
+        }
+      }
+    }
+    wrap.appendChild(labelEl);
+    wrap.appendChild(valueEl);
+    wrap.appendChild(deltaEl);
+    return wrap;
+  }
+
+  function renderRecentCard(){
+    const now = Date.now();
+    const recent7 = moods.filter(m => m.ts >= now - 7*DAY_MS);
+    const prior7 = moods.filter(m => m.ts >= now - 14*DAY_MS && m.ts < now - 7*DAY_MS);
+    const recentMood = recent7.map(m => m.level);
+    const priorMood = prior7.map(m => m.level);
+    const recentAnxiety = recent7.filter(hasAnxiety).map(m => m.anxiety);
+    const priorAnxiety = prior7.filter(hasAnxiety).map(m => m.anxiety);
+
+    recentMetricsEl.innerHTML = '';
+    recentMetricsEl.appendChild(buildRecentMetric('気分', recentMood, priorMood, true));
+    recentMetricsEl.appendChild(buildRecentMetric('不安', recentAnxiety, priorAnxiety, false));
+    recentAsideEl.textContent = recent7.length > 0 ? `7日間に${recent7.length}件記録` : '';
+
+    let moodPhrase = null, anxietyPhrase = null;
+    if (recentMood.length > 0 && priorMood.length > 0){
+      const diff = mean(recentMood) - mean(priorMood);
+      moodPhrase = Math.abs(diff) < 0.3 ? '気分はほぼ横ばい' : (diff > 0 ? '気分は上向き' : '気分はやや下向き');
+    }
+    if (recentAnxiety.length > 0 && priorAnxiety.length > 0){
+      const diff = mean(recentAnxiety) - mean(priorAnxiety);
+      anxietyPhrase = Math.abs(diff) < 0.3 ? '不安もほぼ横ばいです' : (diff > 0 ? '不安は少し高くなっています' : '不安は少し低くなっています');
+    }
+    if (moodPhrase && anxietyPhrase){
+      recentSummaryEl.textContent = `${moodPhrase}で、${anxietyPhrase}`;
+    } else if (moodPhrase){
+      recentSummaryEl.textContent = `${moodPhrase}です。`;
+    } else if (recentMood.length > 0){
+      recentSummaryEl.textContent = '記録が増えると、前の週との比較が表示されます。';
+    } else {
+      recentSummaryEl.textContent = 'まだ記録がありません。「気分」タブから記録してみましょう。';
+    }
+  }
+
+  /* ---- 3. 最近の傾向: 内部の各分析から重要度上位3件だけを表示 ---- */
+  function computeFindings(){
+    const now = Date.now();
+    const candidates = [];
+    const push = (text, detail, magnitude, scale, n) => {
+      if (n < MIN_SAMPLE) return;
+      candidates.push({ text, detail, n, score: Math.abs(magnitude) / scale });
+    };
+
+    // 時間帯別の不安
+    {
+      const byBucket = { '朝':[], '昼':[], '夕方':[], '夜':[] };
+      moods.forEach(m => { if (hasAnxiety(m)) byBucket[timeOfDayBucketKey(new Date(m.ts).getHours())].push(m.anxiety); });
+      Object.entries(byBucket).forEach(([bucket, vals]) => {
+        if (vals.length < MIN_SAMPLE) return;
+        const others = moods.filter(m => hasAnxiety(m) && timeOfDayBucketKey(new Date(m.ts).getHours()) !== bucket).map(m => m.anxiety);
+        if (others.length < MIN_SAMPLE) return;
+        const diff = mean(vals) - mean(others);
+        if (Math.abs(diff) >= 0.3){
+          push(`${bucket}に不安が${diff > 0 ? '高め' : '低め'}です`,
+            `${bucket}の平均不安 ${mean(vals).toFixed(1)} ／ その他の時間帯 ${mean(others).toFixed(1)}`,
+            diff, ANXIETY_MAX, Math.min(vals.length, others.length));
+        }
+      });
+    }
+
+    // メモのテーマ × 不安・気分
+    {
+      const tagged = getMemoTaggedEntries();
+      const overallAnxiety = moods.filter(hasAnxiety).map(m => m.anxiety);
+      const overallMood = moods.map(m => m.level);
+      if (tagged.length >= MIN_SAMPLE){
+        const themes = Array.from(countThemes(tagged).keys());
+        themes.forEach(theme => {
+          const themeEntries = tagged.filter(t => t.categories.includes(theme)).map(t => t.entry);
+          const themeAnxiety = themeEntries.filter(hasAnxiety).map(e => e.anxiety);
+          if (themeAnxiety.length >= MIN_SAMPLE && overallAnxiety.length >= MIN_SAMPLE){
+            const diff = mean(themeAnxiety) - mean(overallAnxiety);
+            if (diff >= 0.3){
+              push(`「${theme}」に関するメモがある時に不安が高めです`,
+                `平均不安 ${mean(themeAnxiety).toFixed(1)} ／ 全体平均 ${mean(overallAnxiety).toFixed(1)}`,
+                diff, ANXIETY_MAX, themeAnxiety.length);
+            }
+          }
+          const themeMood = themeEntries.map(e => e.level);
+          if (themeMood.length >= MIN_SAMPLE){
+            const diff = mean(overallMood) - mean(themeMood);
+            if (diff >= 0.3){
+              push(`「${theme}」に関するメモがある時に気分が低めです`,
+                `平均気分 ${mean(themeMood).toFixed(1)} ／ 全体平均 ${mean(overallMood).toFixed(1)}`,
+                diff, MOOD_MAX, themeMood.length);
+            }
+          }
+        });
+      }
+    }
+
+    // 自慰行為の前後（気分・不安）
+    {
+      const { before, after } = collectAroundWindows(3);
+      if (before.mood.length >= MIN_SAMPLE && after.mood.length >= MIN_SAMPLE){
+        const diff = mean(after.mood) - mean(before.mood);
+        if (Math.abs(diff) >= 0.3){
+          push(diff > 0 ? '自慰行為の後は気分が良い傾向があります' : '自慰行為の前は気分が良い傾向があります',
+            `前3時間 ${mean(before.mood).toFixed(1)} → 後3時間 ${mean(after.mood).toFixed(1)}`,
+            diff, MOOD_MAX, Math.min(before.mood.length, after.mood.length));
+        }
+      }
+      if (before.anxiety.length >= MIN_SAMPLE && after.anxiety.length >= MIN_SAMPLE){
+        const diff = mean(after.anxiety) - mean(before.anxiety);
+        if (Math.abs(diff) >= 0.3){
+          push(diff < 0 ? '自慰行為の後は不安が低い傾向があります' : '自慰行為の前は不安が高い傾向があります',
+            `前3時間 ${mean(before.anxiety).toFixed(1)} → 後3時間 ${mean(after.anxiety).toFixed(1)}`,
+            diff, ANXIETY_MAX, Math.min(before.anxiety.length, after.anxiety.length));
+        }
+      }
+    }
+
+    // 自慰行為があった日／なかった日、翌日
+    {
+      const byDate = groupDaysByMoodAnxiety();
+      const recordDayKeys = new Set(records.map(ts => localDateStr(ts)));
+      const withDays = { mood:[], anxiety:[] }, withoutDays = { mood:[], anxiety:[] };
+      const nextDay = { mood:[], anxiety:[] }, otherDay = { mood:[], anxiety:[] };
+      byDate.forEach((v, key) => {
+        const dayAvgMood = mean(v.mood);
+        const dayAvgAnxiety = v.anxiety.length > 0 ? mean(v.anxiety) : null;
+        const withTarget = recordDayKeys.has(key) ? withDays : withoutDays;
+        withTarget.mood.push(dayAvgMood);
+        if (dayAvgAnxiety != null) withTarget.anxiety.push(dayAvgAnxiety);
+        const nextTarget = recordDayKeys.has(addDays(key, -1)) ? nextDay : otherDay;
+        nextTarget.mood.push(dayAvgMood);
+        if (dayAvgAnxiety != null) nextTarget.anxiety.push(dayAvgAnxiety);
+      });
+      if (withDays.anxiety.length >= MIN_SAMPLE && withoutDays.anxiety.length >= MIN_SAMPLE){
+        const diff = mean(withDays.anxiety) - mean(withoutDays.anxiety);
+        if (Math.abs(diff) >= 0.3){
+          push(diff > 0 ? '自慰行為があった日は不安が高めな傾向があります' : '自慰行為があった日は不安が低めな傾向があります',
+            `あった日 ${mean(withDays.anxiety).toFixed(1)} ／ なかった日 ${mean(withoutDays.anxiety).toFixed(1)}`,
+            diff, ANXIETY_MAX, Math.min(withDays.anxiety.length, withoutDays.anxiety.length));
+        }
+      }
+      if (nextDay.anxiety.length >= MIN_SAMPLE && otherDay.anxiety.length >= MIN_SAMPLE){
+        const diff = mean(nextDay.anxiety) - mean(otherDay.anxiety);
+        if (Math.abs(diff) >= 0.3){
+          push(diff > 0 ? '自慰行為をした翌日は不安が高めな傾向があります' : '自慰行為をした翌日は不安が低めな傾向があります',
+            `翌日 ${mean(nextDay.anxiety).toFixed(1)} ／ その他の日 ${mean(otherDay.anxiety).toFixed(1)}`,
+            diff, ANXIETY_MAX, Math.min(nextDay.anxiety.length, otherDay.anxiety.length));
+        }
+      }
+    }
+
+    // 自慰行為の時間帯の偏り
+    if (records.length >= MIN_SAMPLE){
+      const counts = REC_TOD_BUCKETS.map(b => records.filter(ts => b.test(new Date(ts).getHours())).length);
+      const total = counts.reduce((a,b) => a+b, 0);
+      const maxIdx = counts.indexOf(Math.max(...counts));
+      const share = total > 0 ? counts[maxIdx] / total : 0;
+      if (share >= 0.4){
+        push(`自慰行為は${REC_TOD_BUCKETS[maxIdx].key}に多く記録されています`,
+          `${REC_TOD_BUCKETS[maxIdx].label}：${counts[maxIdx]}回 ／ 全${total}回`,
+          share - 0.25, 1, total);
+      }
+    }
+
+    // 自慰行為の頻度（週あたり）と不安
+    {
+      const weekCounts = new Map();
+      records.forEach(ts => { const key = weekKeyMonday(ts); weekCounts.set(key, (weekCounts.get(key)||0)+1); });
+      const lowWeeks = new Set(Array.from(weekCounts.entries()).filter(([,c]) => c>=1 && c<=2).map(([k])=>k));
+      const highWeeks = new Set(Array.from(weekCounts.entries()).filter(([,c]) => c>=5).map(([k])=>k));
+      const lowAnxiety = moods.filter(m => hasAnxiety(m) && lowWeeks.has(weekKeyMonday(m.ts))).map(m=>m.anxiety);
+      const highAnxiety = moods.filter(m => hasAnxiety(m) && highWeeks.has(weekKeyMonday(m.ts))).map(m=>m.anxiety);
+      if (lowAnxiety.length >= MIN_SAMPLE && highAnxiety.length >= MIN_SAMPLE){
+        const diff = mean(highAnxiety) - mean(lowAnxiety);
+        if (Math.abs(diff) >= 0.3){
+          push(diff > 0 ? '自慰行為の頻度が多い週は不安がやや高い傾向があります' : '自慰行為の頻度が多い週は不安がやや低い傾向があります',
+            `週5回以上 ${mean(highAnxiety).toFixed(1)} ／ 週1〜2回 ${mean(lowAnxiety).toFixed(1)}`,
+            diff, ANXIETY_MAX, Math.min(lowAnxiety.length, highAnxiety.length));
+        }
+      }
+    }
+
+    // 気分の変動（直近30日 vs その前30日）
+    {
+      const recentLevels = moods.filter(m => m.ts >= now - 30*DAY_MS).map(m => m.level);
+      const priorLevels = moods.filter(m => m.ts >= now - 60*DAY_MS && m.ts < now - 30*DAY_MS).map(m => m.level);
+      if (recentLevels.length >= MIN_SAMPLE && priorLevels.length >= MIN_SAMPLE){
+        const recentSd = stdev(recentLevels), priorSd = stdev(priorLevels);
+        const diff = recentSd - priorSd;
+        if (Math.abs(diff) >= 0.4){
+          push(diff > 0 ? '最近は気分の振れ幅が以前より大きくなっています' : '最近は気分の振れ幅が以前より小さくなっています',
+            `直近30日の変動 ${recentSd.toFixed(1)} ／ その前30日 ${priorSd.toFixed(1)}`,
+            diff, 3, Math.min(recentLevels.length, priorLevels.length));
+        }
+      }
+    }
+
+    return candidates;
+  }
+
+  function renderFindings(){
+    const top = computeFindings().sort((a,b) => b.score - a.score).slice(0, 3);
+    findingsListEl.innerHTML = '';
+    if (top.length === 0){
+      findingsListEl.innerHTML = '<p class="findings-empty">まだ明確な傾向はありません。記録が増えると、ここに表示されます。</p>';
       return;
     }
-
-    const levels = moods.map(m => m.level);
-    statAvgEl.textContent = mean(levels).toFixed(1);
-    statCountEl.textContent = String(moods.length);
-
-    const anxietyVals = moods.filter(hasAnxiety).map(m => m.anxiety);
-    statAnxietyAvgEl.textContent = anxietyVals.length > 0 ? mean(anxietyVals).toFixed(1) : 'データなし';
-
-    // thresholds for the 0–6 mood range
-    const sd = stdev(levels);
-    statVolatilityEl.textContent = sd < 0.6 ? '安定' : (sd < 1.2 ? 'やや変動' : '変動大');
-
-    updateTrendChart();
-
-    // ---- time-of-day pattern ----
-    const buckets = { '朝':[], '昼':[], '夕':[], '夜':[] };
-    const anxietyBuckets = { '朝':[], '昼':[], '夕':[], '夜':[] };
-    moods.forEach(m => {
-      const h = new Date(m.ts).getHours();
-      let key;
-      if (h >= 5 && h < 11) key = '朝';
-      else if (h >= 11 && h < 17) key = '昼';
-      else if (h >= 17 && h < 21) key = '夕';
-      else key = '夜';
-      buckets[key].push(m.level);
-      if (hasAnxiety(m)) anxietyBuckets[key].push(m.anxiety);
+    top.forEach((f, i) => {
+      const item = document.createElement('div');
+      item.className = 'finding-item';
+      const rank = document.createElement('div');
+      rank.className = 'rank';
+      rank.textContent = String(i+1);
+      const body = document.createElement('div');
+      const headline = document.createElement('div');
+      headline.className = 'headline';
+      headline.textContent = f.text + (f.n < REFERENCE_SAMPLE ? '（参考）' : '');
+      body.appendChild(headline);
+      if (f.detail){
+        const detail = document.createElement('div');
+        detail.className = 'detail';
+        detail.textContent = f.detail;
+        body.appendChild(detail);
+      }
+      item.appendChild(rank);
+      item.appendChild(body);
+      findingsListEl.appendChild(item);
     });
-    renderTimeOfDayChart(buckets);
-    renderAnxietyTimeOfDayChart(anxietyBuckets);
+  }
 
-    // ---- insight: last 7 days vs the 7 days before that ----
+  /* ---- 4. 自慰行為との関連（1セクションに集約） ---- */
+  function renderRecSummary(){
+    if (records.length === 0){
+      recSummaryBodyEl.textContent = 'まだ自慰行為の記録がありません。';
+      return;
+    }
     const now = Date.now();
-    const recent7 = moods.filter(m => m.ts >= now - 7*DAY_MS).map(m => m.level);
-    const prior7 = moods.filter(m => m.ts >= now - 14*DAY_MS && m.ts < now - 7*DAY_MS).map(m => m.level);
-    if (recent7.length > 0 && prior7.length > 0){
-      const a = mean(recent7), b = mean(prior7);
-      const diff = a - b;
-      if (Math.abs(diff) < 0.3){
-        insightCardEl.innerHTML = `直近7日間の平均気分は <strong>${a.toFixed(1)}</strong> で、その前の週（${b.toFixed(1)}）とほぼ同じ水準です。`;
-      } else if (diff > 0){
-        insightCardEl.innerHTML = `直近7日間の平均気分は <strong>${a.toFixed(1)}</strong> で、その前の週（${b.toFixed(1)}）より落ち着いています。`;
-      } else {
-        insightCardEl.innerHTML = `直近7日間の平均気分は <strong>${a.toFixed(1)}</strong> で、その前の週（${b.toFixed(1)}）よりやや不安定です。`;
-      }
-    } else if (recent7.length > 0){
-      insightCardEl.innerHTML = `直近7日間の平均気分は <strong>${mean(recent7).toFixed(1)}</strong> です。記録が増えると、前の週との比較も表示されます。`;
-    } else {
-      insightCardEl.textContent = '記録が増えると、傾向が見えてきます。';
-    }
+    const count30 = records.filter(ts => ts >= now - 30*DAY_MS).length;
+    const { before, after, comparedCount } = collectAroundWindows(3);
 
-    // ---- anxiety insight: same week-over-week comparison ----
-    const recentA = moods.filter(m => m.ts >= now - 7*DAY_MS && hasAnxiety(m)).map(m => m.anxiety);
-    const priorA = moods.filter(m => m.ts >= now - 14*DAY_MS && m.ts < now - 7*DAY_MS && hasAnxiety(m)).map(m => m.anxiety);
-    if (recentA.length > 0 && priorA.length > 0){
-      const a = mean(recentA), b = mean(priorA);
-      const diff = a - b;
-      anxietyInsightCardEl.hidden = false;
-      if (Math.abs(diff) < 0.3){
-        anxietyInsightCardEl.innerHTML = `直近7日間の平均不安は <strong>${a.toFixed(1)}</strong> で、その前の週（${b.toFixed(1)}）とほぼ同じ水準です。`;
-      } else if (diff < 0){
-        anxietyInsightCardEl.innerHTML = `直近7日間の平均不安は <strong>${a.toFixed(1)}</strong> で、その前の週（${b.toFixed(1)}）より低くなっています。`;
-      } else {
-        anxietyInsightCardEl.innerHTML = `直近7日間の平均不安は <strong>${a.toFixed(1)}</strong> で、その前の週（${b.toFixed(1)}）より高くなっています。`;
-      }
-    } else if (recentA.length > 0){
-      anxietyInsightCardEl.hidden = false;
-      anxietyInsightCardEl.innerHTML = `直近7日間の平均不安は <strong>${mean(recentA).toFixed(1)}</strong> です。記録が増えると、前の週との比較も表示されます。`;
-    } else {
-      anxietyInsightCardEl.hidden = true;
-    }
+    let html = `<div class="rec-summary-line"><strong>過去30日</strong>　${count30}回</div>`;
+    const moodOk = before.mood.length >= MIN_SAMPLE && after.mood.length >= MIN_SAMPLE;
+    const anxietyOk = before.anxiety.length >= MIN_SAMPLE && after.anxiety.length >= MIN_SAMPLE;
 
+    if (moodOk || anxietyOk){
+      html += `<div class="rec-summary-line" style="margin-top:0.5rem;">比較できた記録：${comparedCount}回</div>`;
+      if (moodOk) html += `<div class="rec-summary-line">気分　前 ${mean(before.mood).toFixed(1)} → 後 ${mean(after.mood).toFixed(1)}</div>`;
+      if (anxietyOk) html += `<div class="rec-summary-line">不安　前 ${mean(before.anxiety).toFixed(1)} → 後 ${mean(after.anxiety).toFixed(1)}</div>`;
+
+      let sentence = '';
+      if (anxietyOk){
+        const d = mean(after.anxiety) - mean(before.anxiety);
+        if (Math.abs(d) >= 0.3) sentence = d < 0 ? '記録上、自慰行為後は不安が低い傾向があります。' : '記録上、自慰行為後は不安が高い傾向があります。';
+      }
+      if (!sentence && moodOk){
+        const d = mean(after.mood) - mean(before.mood);
+        if (Math.abs(d) >= 0.3) sentence = d > 0 ? '記録上、自慰行為後は気分が良い傾向があります。' : '記録上、自慰行為後は気分が低い傾向があります。';
+      }
+      if (sentence) html += `<p class="rec-summary-text">${sentence}</p>`;
+    } else {
+      html += `<p class="rec-summary-text">まだ十分なデータがありません。</p>`;
+    }
+    recSummaryBodyEl.innerHTML = html;
+  }
+
+  /* ---- 5. メモから見えること（要約のみ、詳細は「詳しく見る」） ---- */
+  function renderMemoSummary(){
+    const tagged = getMemoTaggedEntries();
+    if (tagged.length < MIN_SAMPLE){
+      memoSummaryBodyEl.textContent = 'まだ十分なメモがありません。';
+      return;
+    }
+    const anxious = tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 3);
+    const good = tagged.filter(t => t.entry.level >= 4);
+    let html = '';
+    if (anxious.length >= MIN_SAMPLE){
+      const top = Array.from(countThemes(anxious).entries()).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([t])=>t);
+      html += `<div class="rec-summary-line"><strong>不安が強い時に多いテーマ</strong>　${top.join('・')}</div>`;
+    }
+    if (good.length >= MIN_SAMPLE){
+      html += `<div class="rec-summary-line" style="margin-top:0.5rem;"><strong>気分が良い時に多いテーマ</strong>　${Array.from(countThemes(good).entries()).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([t])=>t).join('・')}</div>`;
+    }
+    memoSummaryBodyEl.innerHTML = html || 'まだ十分なデータがありません。';
+  }
+
+  function renderAnalysis(){
+    renderRecentCard();
+    updateTrendChart();
+    renderFindings();
     renderRecFrequency();
-    renderRecAround();
     renderRecDayCompare();
     renderRecNextDay();
     renderRecFrequencyBuckets();
     renderRecTimeOfDay();
-    renderRecComments();
+    renderRecSummary();
     renderMemoAnalysis();
+    renderMemoSummary();
   }
 
   const TREND_W = 320, TREND_H = 130, TREND_PAD_X = 14, TREND_PAD_Y = 14;
@@ -1967,102 +2245,9 @@
     showAnxietyTrendTooltip(lastWithData.point);
   }
 
-  function renderTimeOfDayChart(buckets){
-    timeOfDaySvg.innerHTML = '';
-    const keys = ['朝','昼','夕','夜'];
-    const W = 320, H = 130, PAD_X = 20, PAD_TOP = 12, PAD_BOTTOM = 24;
-    const plotH = H - PAD_TOP - PAD_BOTTOM;
-    const slotW = (W - PAD_X*2) / keys.length;
-    const barW = 24;
-    const yForLevel = level => PAD_TOP + plotH * (MOOD_MAX - level) / (MOOD_MAX - MOOD_MIN);
-    const baseline = PAD_TOP + plotH;
-
-    const defs = svgEl('defs', {});
-    const barGrad = svgEl('linearGradient', { id:'barGrad', x1:'0', y1:'0', x2:'0', y2:'1' });
-    barGrad.appendChild(svgEl('stop', { offset:'0%', 'stop-color':'#0e7490' }));
-    barGrad.appendChild(svgEl('stop', { offset:'100%', 'stop-color':'#0f766e' }));
-    defs.appendChild(barGrad);
-    timeOfDaySvg.appendChild(defs);
-
-    keys.forEach((key, i) => {
-      const cx = PAD_X + slotW*i + slotW/2;
-      const values = buckets[key];
-      const label = svgEl('text', { x:cx, y:H-6, 'text-anchor':'middle', class:'bar-axis-label' });
-      label.textContent = key;
-      timeOfDaySvg.appendChild(label);
-
-      if (values.length === 0){
-        timeOfDaySvg.appendChild(svgEl('line', {
-          x1:cx-barW/2, x2:cx+barW/2, y1:baseline, y2:baseline,
-          stroke:'var(--outline)', 'stroke-width':'2', 'stroke-linecap':'round'
-        }));
-        return;
-      }
-
-      const avg = mean(values);
-      const top = yForLevel(avg);
-      const rect = svgEl('rect', {
-        x:cx-barW/2, y:top, width:barW, height:Math.max(2, baseline-top),
-        rx:4, ry:4, fill:'url(#barGrad)'
-      });
-      timeOfDaySvg.appendChild(rect);
-
-      const valueLabel = svgEl('text', {
-        x:cx, y:top-6, 'text-anchor':'middle', class:'bar-axis-label'
-      });
-      valueLabel.setAttribute('fill', 'var(--on-surface)');
-      valueLabel.textContent = avg.toFixed(1);
-      timeOfDaySvg.appendChild(valueLabel);
-    });
-  }
-
-  // Same layout as renderTimeOfDayChart, on the anxiety 0–4 scale/colors.
-  function renderAnxietyTimeOfDayChart(buckets){
-    anxietyTimeOfDaySvg.innerHTML = '';
-    const keys = ['朝','昼','夕','夜'];
-    const W = 320, H = 130, PAD_X = 20, PAD_TOP = 12, PAD_BOTTOM = 24;
-    const plotH = H - PAD_TOP - PAD_BOTTOM;
-    const slotW = (W - PAD_X*2) / keys.length;
-    const barW = 24;
-    const yForLevel = level => PAD_TOP + plotH * (ANXIETY_MAX - level) / (ANXIETY_MAX - ANXIETY_MIN);
-    const baseline = PAD_TOP + plotH;
-
-    const defs = svgEl('defs', {});
-    const barGrad = svgEl('linearGradient', { id:'anxietyBarGrad', x1:'0', y1:'0', x2:'0', y2:'1' });
-    barGrad.appendChild(svgEl('stop', { offset:'0%', 'stop-color':'#d2781e' }));
-    barGrad.appendChild(svgEl('stop', { offset:'100%', 'stop-color':'#a15c17' }));
-    defs.appendChild(barGrad);
-    anxietyTimeOfDaySvg.appendChild(defs);
-
-    keys.forEach((key, i) => {
-      const cx = PAD_X + slotW*i + slotW/2;
-      const values = buckets[key];
-      const label = svgEl('text', { x:cx, y:H-6, 'text-anchor':'middle', class:'bar-axis-label' });
-      label.textContent = key;
-      anxietyTimeOfDaySvg.appendChild(label);
-
-      if (values.length === 0){
-        anxietyTimeOfDaySvg.appendChild(svgEl('line', {
-          x1:cx-barW/2, x2:cx+barW/2, y1:baseline, y2:baseline,
-          stroke:'var(--outline)', 'stroke-width':'2', 'stroke-linecap':'round'
-        }));
-        return;
-      }
-
-      const avg = mean(values);
-      const top = yForLevel(avg);
-      const rect = svgEl('rect', {
-        x:cx-barW/2, y:top, width:barW, height:Math.max(2, baseline-top),
-        rx:4, ry:4, fill:'url(#anxietyBarGrad)'
-      });
-      anxietyTimeOfDaySvg.appendChild(rect);
-
-      const valueLabel = svgEl('text', { x:cx, y:top-6, 'text-anchor':'middle', class:'bar-axis-label' });
-      valueLabel.setAttribute('fill', 'var(--on-surface)');
-      valueLabel.textContent = avg.toFixed(1);
-      anxietyTimeOfDaySvg.appendChild(valueLabel);
-    });
-  }
+  // Note: per-time-of-day mood/anxiety bar charts were dropped from the
+  // main screen (findings say the same thing in a sentence instead) —
+  // the bucket math they used lives on in computeFindings() above.
 
   /* =====================================================================
      自慰行為（records）とのつきあわせ分析 — Part B
@@ -2072,22 +2257,31 @@
      causation — captions stay in "傾向があります" register.
      ===================================================================== */
 
+  // Only records that have *both* a before- and an after-window mood entry
+  // count toward the comparison — a record contributing to just one side
+  // would make "compared: N" and the shown averages describe different
+  // sets of records, which is misleading even if each side individually
+  // clears MIN_SAMPLE.
   function collectAroundWindows(hours, recordSubset){
     const windowMs = hours*HOUR_MS;
     const before = { mood:[], anxiety:[] };
     const after = { mood:[], anxiety:[] };
+    let comparedCount = 0;
     (recordSubset || records).forEach(r => {
-      moods.forEach(m => {
-        if (m.ts >= r - windowMs && m.ts < r){
-          before.mood.push(m.level);
-          if (hasAnxiety(m)) before.anxiety.push(m.anxiety);
-        } else if (m.ts > r && m.ts <= r + windowMs){
-          after.mood.push(m.level);
-          if (hasAnxiety(m)) after.anxiety.push(m.anxiety);
-        }
+      const beforeEntries = moods.filter(m => m.ts >= r - windowMs && m.ts < r);
+      const afterEntries = moods.filter(m => m.ts > r && m.ts <= r + windowMs);
+      if (beforeEntries.length === 0 || afterEntries.length === 0) return;
+      comparedCount++;
+      beforeEntries.forEach(m => {
+        before.mood.push(m.level);
+        if (hasAnxiety(m)) before.anxiety.push(m.anxiety);
+      });
+      afterEntries.forEach(m => {
+        after.mood.push(m.level);
+        if (hasAnxiety(m)) after.anxiety.push(m.anxiety);
       });
     });
-    return { before, after };
+    return { before, after, comparedCount };
   }
 
   function computeRecFrequency(){
@@ -2131,62 +2325,9 @@
     body.appendChild(p);
   }
 
-  function buildCompareBlock(title, labelA, valA, labelB, valB, min, max, colorMap){
-    const wrap = document.createElement('div');
-    wrap.className = 'compare-block';
-    const t = document.createElement('div');
-    t.className = 'compare-title';
-    t.textContent = title;
-    wrap.appendChild(t);
-
-    const bars = document.createElement('div');
-    bars.className = 'compare-bars';
-    [[labelA, valA], [labelB, valB]].forEach(([label, val]) => {
-      const row = document.createElement('div');
-      row.className = 'compare-bar-row';
-      const pct = Math.max(0, Math.min(100, (val - min) / (max - min) * 100));
-      const roundedLevel = Math.max(min, Math.min(max, Math.round(val)));
-      row.innerHTML = `<span class="tag">${label}</span><span class="track"><span class="fill" style="width:${pct}%;background:${colorMap[roundedLevel]}"></span></span><span class="val">${val.toFixed(1)}</span>`;
-      bars.appendChild(row);
-    });
-    wrap.appendChild(bars);
-
-    const diff = valB - valA;
-    const delta = document.createElement('div');
-    delta.className = 'compare-delta';
-    delta.innerHTML = `変化　<span class="value">${diff>0?'+':''}${diff.toFixed(1)}</span>`;
-    wrap.appendChild(delta);
-    return wrap;
-  }
-
-  function renderRecAround(){
-    const body = document.getElementById('recAroundBody');
-    body.innerHTML = '';
-    if (records.length === 0 || moods.length === 0){
-      body.innerHTML = '<p class="note">データがまだ十分ではありません。</p>';
-      return;
-    }
-    const { before, after } = collectAroundWindows(3);
-    const enoughMood = before.mood.length >= MIN_SAMPLE && after.mood.length >= MIN_SAMPLE;
-    const enoughAnxiety = before.anxiety.length >= MIN_SAMPLE && after.anxiety.length >= MIN_SAMPLE;
-
-    if (!enoughMood && !enoughAnxiety){
-      body.innerHTML = '<p class="note">データがまだ十分ではありません（前後それぞれ5件以上で表示されます）。</p>';
-      return;
-    }
-    if (enoughMood){
-      body.appendChild(buildCompareBlock('気分（0〜6）', '前3時間', mean(before.mood), '後3時間', mean(after.mood), MOOD_MIN, MOOD_MAX, MOOD_COLORS));
-    }
-    if (enoughAnxiety){
-      body.appendChild(buildCompareBlock('不安（0〜4）', '前3時間', mean(before.anxiety), '後3時間', mean(after.anxiety), ANXIETY_MIN, ANXIETY_MAX, ANXIETY_COLORS));
-    }
-    if (!enoughMood || !enoughAnxiety){
-      const p = document.createElement('p');
-      p.className = 'note';
-      p.textContent = '※ 表示していない項目はデータがまだ十分ではありません。';
-      body.appendChild(p);
-    }
-  }
+  // Note: the old per-metric compare-bar UI for 自慰行為 前後 was dropped —
+  // renderRecSummary() below shows the same 前→後 numbers as plain text,
+  // and collectAroundWindows() (the underlying data) also feeds computeFindings().
 
   function buildDayCompareCol(heading, group){
     const col = document.createElement('div');
@@ -2362,60 +2503,9 @@
     body.appendChild(rows);
   }
 
-  function renderRecComments(){
-    const body = document.getElementById('recCommentBody');
-    body.innerHTML = '';
-    const comments = [];
-
-    if (records.length > 0 && moods.length > 0){
-      const { before, after } = collectAroundWindows(3);
-      if (before.mood.length >= MIN_SAMPLE && after.mood.length >= MIN_SAMPLE){
-        const d = mean(after.mood) - mean(before.mood);
-        if (Math.abs(d) >= 0.3) comments.push(`記録上、自慰行為後3時間以内は平均気分が${Math.abs(d).toFixed(1)}${d>0?'高く':'低く'}なっています。`);
-      }
-      if (before.anxiety.length >= MIN_SAMPLE && after.anxiety.length >= MIN_SAMPLE){
-        const d = mean(after.anxiety) - mean(before.anxiety);
-        if (Math.abs(d) >= 0.3) comments.push(`記録上、自慰行為後3時間以内は平均不安が${Math.abs(d).toFixed(1)}${d<0?'低く':'高く'}なっています。`);
-      }
-    }
-
-    if (records.length >= MIN_SAMPLE){
-      const counts = REC_TOD_BUCKETS.map(b => records.filter(ts => b.test(new Date(ts).getHours())).length);
-      const total = counts.reduce((a,b)=>a+b,0);
-      const maxIdx = counts.indexOf(Math.max(...counts));
-      if (total > 0 && counts[maxIdx] / total >= 0.4){
-        comments.push(`記録上、${REC_TOD_BUCKETS[maxIdx].key}に自慰行為が多い傾向があります。`);
-      }
-    }
-
-    {
-      const weekCounts = new Map();
-      records.forEach(ts => { const key = weekKeyMonday(ts); weekCounts.set(key, (weekCounts.get(key)||0)+1); });
-      const lowWeeks = new Set(Array.from(weekCounts.entries()).filter(([,c]) => c>=1 && c<=2).map(([k])=>k));
-      const highWeeks = new Set(Array.from(weekCounts.entries()).filter(([,c]) => c>=5).map(([k])=>k));
-      const lowAnxiety = moods.filter(m => hasAnxiety(m) && lowWeeks.has(weekKeyMonday(m.ts))).map(m=>m.anxiety);
-      const highAnxiety = moods.filter(m => hasAnxiety(m) && highWeeks.has(weekKeyMonday(m.ts))).map(m=>m.anxiety);
-      if (lowAnxiety.length >= MIN_SAMPLE && highAnxiety.length >= MIN_SAMPLE){
-        const diff = mean(highAnxiety) - mean(lowAnxiety);
-        if (diff >= 0.3) comments.push('記録上、頻度が多い週は平均不安がやや高い傾向があります。');
-        else if (diff <= -0.3) comments.push('記録上、頻度が多い週は平均不安がやや低い傾向があります。');
-      }
-    }
-
-    if (comments.length === 0){
-      body.innerHTML = '<p class="note">自慰行為の記録が増えると、ここに傾向コメントが表示されます。</p>';
-      return;
-    }
-    const list = document.createElement('div');
-    list.className = 'comment-list';
-    comments.forEach(text => {
-      const el = document.createElement('div');
-      el.className = 'comment';
-      el.textContent = text;
-      list.appendChild(el);
-    });
-    body.appendChild(list);
-  }
+  // Note: the old standalone "自慰行為との関連コメント" list was folded into
+  // computeFindings() above (same signals: before/after, time-of-day skew,
+  // frequency vs anxiety) — it now surfaces only when it ranks in the top 3.
 
   /* =====================================================================
      ひとことメモの傾向分析 — Part C
