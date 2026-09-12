@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="0" />
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Daily Log" />
 <meta name="theme-color" content="#0f766e" />
-<meta name="app-build" content="20260912-1626" />
+<meta name="app-build" content="20260912-1636" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -261,40 +261,41 @@
   }
   /* One tap on a row = saved immediately, same as the old dot row. */
   .choice-list{
-    display:flex;
-    flex-direction:column;
-    gap:0.4rem;
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(58px, 1fr));
+    gap:0.5rem;
   }
   .choice-row{
     appearance:none;
     border:none;
     cursor:pointer;
     display:flex;
+    flex-direction:column;
     align-items:center;
-    gap:0.75rem;
-    width:100%;
-    padding:0.55rem 0.75rem 0.55rem 0.55rem;
-    border-radius:9999px;
+    gap:0.35rem;
+    padding:0.65rem 0.25rem;
+    border-radius:1.1rem;
     background:var(--surface-container);
     font-family:inherit;
-    text-align:left;
+    text-align:center;
     transition:transform 0.08s ease;
   }
-  .choice-row:active{ transform:scale(0.98); }
+  .choice-row:active{ transform:scale(0.96); }
   .choice-row.selected{ box-shadow:0 0 0 2px var(--primary) inset; }
   .choice-badge{
     flex:0 0 auto;
-    width:34px;
-    height:34px;
+    width:32px;
+    height:32px;
     border-radius:9999px;
     display:flex;
     align-items:center;
     justify-content:center;
-    font-size:15px;
+    font-size:14px;
     font-weight:700;
   }
   .choice-label{
-    font-size:14px;
+    font-size:10.5px;
+    line-height:1.25;
     font-weight:500;
     color:var(--on-surface);
   }
@@ -356,7 +357,8 @@
     background:var(--surface-container);
     color:var(--on-surface);
     font-family:inherit;
-    font-size:13px;
+    /* 16px+ stops iOS Safari from auto-zooming the page on focus */
+    font-size:16px;
     padding:0.7rem 0.8rem;
     box-sizing:border-box;
   }
@@ -463,6 +465,7 @@
     inset:0;
     opacity:0;
     width:100%;
+    font-size:16px;
     cursor:pointer;
   }
   .date-nav-today{
