@@ -2,7 +2,17 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
+<!-- iOS "Add to Home Screen": these make it launch as its own standalone
+     app window instead of reusing/restoring an old Safari tab. -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Daily Log" />
+<meta name="theme-color" content="#0f766e" />
+<meta name="app-build" content="20260912-1" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -444,9 +454,57 @@
   }
   .nav-item.active{ color:var(--primary); }
   .nav-item svg{ width:22px; height:22px; }
+
+  /* ---- update banner (shown when a newer deploy is detected) ---- */
+  .update-banner{
+    position:fixed;
+    left:0;
+    right:0;
+    top:0;
+    z-index:50;
+    display:flex;
+    justify-content:center;
+    padding-top:env(safe-area-inset-top);
+  }
+  .update-banner[hidden]{ display:none; }
+  .update-banner-inner{
+    width:100%;
+    max-width:480px;
+    margin:0.6rem 1rem 0;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:0.75rem;
+    background:linear-gradient(135deg, var(--accent-a), var(--accent-b));
+    color:#ffffff;
+    border-radius:9999px;
+    padding:0.6rem 0.6rem 0.6rem 1.1rem;
+    font-size:13px;
+    box-shadow:0 8px 20px rgba(15,118,110,0.3);
+  }
+  .update-banner-btn{
+    appearance:none;
+    border:none;
+    background:rgba(255,255,255,0.22);
+    color:#ffffff;
+    font-family:inherit;
+    font-size:12px;
+    font-weight:600;
+    padding:0.45rem 0.9rem;
+    border-radius:9999px;
+    cursor:pointer;
+    flex:0 0 auto;
+  }
 </style>
 </head>
 <body>
+  <div class="update-banner" id="updateBanner" hidden>
+    <div class="update-banner-inner">
+      <span>新しいバージョンがあります</span>
+      <button class="update-banner-btn" id="updateBannerBtn">更新する</button>
+    </div>
+  </div>
+
   <div class="app">
 
     <section class="screen" id="screen-record">
@@ -1245,10 +1303,45 @@
     }
   });
 
+  /* ---------------- update check (fixes stale Home Screen icon on iOS) ----------------
+     Adding a plain page to iOS's Home Screen just bookmarks the URL — tapping the icon
+     can resurrect an old Safari tab/cache instead of fetching fresh. So on load, and
+     whenever the app becomes visible again (e.g. reopened from the Home Screen), refetch
+     this same page bypassing the cache and compare its <meta name="app-build"> to ours;
+     if it changed, prompt to reload with a cache-busted URL. Local data is untouched —
+     it lives in localStorage, separate from this page-cache check. */
+  const CURRENT_BUILD = document.querySelector('meta[name="app-build"]')?.content || '';
+  const updateBanner = document.getElementById('updateBanner');
+  const updateBannerBtn = document.getElementById('updateBannerBtn');
+  let updateAvailable = false;
+
+  async function checkForUpdate(){
+    if (updateAvailable) return;
+    try{
+      const res = await fetch(location.pathname, { cache: 'no-store' });
+      const html = await res.text();
+      const match = html.match(/<meta\s+name="app-build"\s+content="([^"]*)"/);
+      const latestBuild = match ? match[1] : '';
+      if (latestBuild && latestBuild !== CURRENT_BUILD){
+        updateAvailable = true;
+        updateBanner.hidden = false;
+      }
+    }catch(e){ /* offline or blocked — ignore, try again next time */ }
+  }
+
+  updateBannerBtn.addEventListener('click', () => {
+    location.href = location.pathname + '?_v=' + Date.now();
+  });
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') checkForUpdate();
+  });
+
   /* ---------------- init ---------------- */
   renderRecord();
   renderMoodHistory();
   renderMoodDay();
+  checkForUpdate();
 })();
 </script>
 </body>
