@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Daily Log" />
 <meta name="theme-color" content="#0f766e" />
-<meta name="app-build" content="20260912-1705" />
+<meta name="app-build" content="20260912-1713" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -260,19 +260,15 @@
     margin-bottom:1.5rem;
   }
   /* One tap on a row = saved immediately, same as the old dot row. */
-  /* One horizontally-scrollable row — every option stays on a single
-     line, no wrap to a second row of chips. */
+  /* Wraps to as many rows as needed — every chip is visible at once,
+     no swipe/scroll required. Each chip's own content (digit + label)
+     stays on a single line. */
   .choice-list{
     display:flex;
     flex-direction:row;
-    flex-wrap:nowrap;
-    overflow-x:auto;
+    flex-wrap:wrap;
     gap:0.45rem;
-    padding-bottom:0.15rem;
-    -webkit-overflow-scrolling:touch;
-    scrollbar-width:none;
   }
-  .choice-list::-webkit-scrollbar{ display:none; }
   .choice-row{
     appearance:none;
     border:none;
