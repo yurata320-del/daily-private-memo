@@ -22,6 +22,13 @@
     --secondary: #4f5d73;
     --moss: #5e7369;
     --error: #ffb4ab;
+    /* Mood ordinal ramp — one hue, monotone lightness, validated against --surface
+       with scripts/validate_palette.js --ordinal (light→dark order below). */
+    --mood-5: #d4e4fc;
+    --mood-4: #b8c8df;
+    --mood-3: #8f9fb8;
+    --mood-2: #66748a;
+    --mood-1: #454f5e;
   }
   *{box-sizing:border-box;}
   html,body{
@@ -40,10 +47,11 @@
     width:100%;
     max-width:480px;
     min-height:100vh;
-    padding:1.5rem 1.25rem 3rem;
+    padding:1.5rem 1.25rem calc(5.5rem + env(safe-area-inset-bottom));
     display:flex;
     flex-direction:column;
   }
+  .screen[hidden]{ display:none; }
   header{
     display:flex;
     align-items:center;
@@ -56,6 +64,13 @@
     letter-spacing:-0.01em;
     margin:0;
   }
+  header p.subtitle{
+    font-size:13px;
+    color:var(--on-surface-variant);
+    margin:0.25rem 0 0;
+  }
+
+  /* ---- Record screen ---- */
   .status-card{
     background:var(--surface-container-low);
     border:1px solid rgba(255,255,255,0.04);
@@ -80,7 +95,7 @@
     font-size:12px;
     color:var(--on-surface-variant);
   }
-  .log-button{
+  .primary-button{
     appearance:none;
     border:none;
     width:100%;
@@ -99,27 +114,27 @@
     margin-bottom:2rem;
     transition:transform 0.08s ease, opacity 0.15s ease;
   }
-  .log-button:active{
+  .primary-button:active{
     transform:scale(0.97);
     opacity:0.9;
   }
-  .history-header{
+  .section-header{
     display:flex;
     align-items:center;
     justify-content:space-between;
     margin-bottom:0.75rem;
   }
-  .history-header h2{
+  .section-header h2{
     font-size:14px;
     font-weight:500;
     color:var(--on-surface-variant);
     margin:0;
   }
-  .history-header .count{
+  .section-header .count{
     font-size:12px;
     color:var(--on-surface-variant);
   }
-  .history-list{
+  .list{
     display:flex;
     flex-direction:column;
     gap:0.5rem;
@@ -127,7 +142,7 @@
     margin:0;
     padding:0;
   }
-  .history-item{
+  .list-item{
     display:flex;
     align-items:center;
     justify-content:space-between;
@@ -135,15 +150,16 @@
     border-radius:1rem;
     padding:0.9rem 1rem;
   }
-  .history-item .datetime{
+  .list-item .datetime{
     font-size:14px;
   }
-  .history-item .interval{
+  .list-item .interval{
     font-size:12px;
     color:var(--on-surface-variant);
     margin-top:2px;
   }
-  .history-item button{
+  .list-item .left{ display:flex; align-items:center; gap:0.6rem; }
+  .list-item button.delete{
     appearance:none;
     background:transparent;
     border:none;
@@ -155,7 +171,7 @@
     align-items:center;
     justify-content:center;
   }
-  .history-item button:hover{
+  .list-item button.delete:hover{
     color:var(--error);
     background:rgba(255,255,255,0.04);
   }
@@ -166,54 +182,233 @@
     padding:2rem 0;
   }
   svg{ display:block; }
+
+  /* ---- Mood screen ---- */
+  .mood-prompt{
+    font-size:15px;
+    color:var(--on-surface-variant);
+    text-align:center;
+    margin:0 0 1.25rem;
+  }
+  .mood-picker{
+    background:var(--surface-container-low);
+    border:1px solid rgba(255,255,255,0.04);
+    border-radius:2rem;
+    padding:1.5rem 1rem 1.25rem;
+    margin-bottom:2rem;
+  }
+  .mood-scale{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:0.5rem;
+  }
+  .mood-dot{
+    appearance:none;
+    border:none;
+    cursor:pointer;
+    width:52px;
+    height:52px;
+    border-radius:9999px;
+    font-family:inherit;
+    font-size:16px;
+    font-weight:600;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:transform 0.08s ease;
+    flex:0 0 auto;
+  }
+  .mood-dot:active{ transform:scale(0.92); }
+  .mood-dot[data-level="1"]{ background:var(--mood-1); color:#e7ebf1; }
+  .mood-dot[data-level="2"]{ background:var(--mood-2); color:#e7ebf1; }
+  .mood-dot[data-level="3"]{ background:var(--mood-3); color:#171a1f; }
+  .mood-dot[data-level="4"]{ background:var(--mood-4); color:#171a1f; }
+  .mood-dot[data-level="5"]{ background:var(--mood-5); color:#171a1f; }
+  .mood-scale-labels{
+    display:flex;
+    justify-content:space-between;
+    margin-top:0.6rem;
+    font-size:11px;
+    color:var(--on-surface-variant);
+  }
+  .mood-toast{
+    text-align:center;
+    font-size:12px;
+    color:var(--on-surface-variant);
+    height:1.2em;
+    margin:-1.5rem 0 1.5rem;
+    opacity:0;
+    transition:opacity 0.2s ease;
+  }
+  .mood-toast.show{ opacity:1; }
+
+  .trend-card{
+    background:var(--surface-container-low);
+    border:1px solid rgba(255,255,255,0.04);
+    border-radius:1.5rem;
+    padding:1.25rem 1rem 0.75rem;
+    margin-bottom:2rem;
+  }
+  .trend-card .section-header{ padding:0 0.25rem; }
+  .trend-tooltip{
+    font-size:12px;
+    color:var(--on-surface);
+    background:var(--surface-container-high);
+    border-radius:0.75rem;
+    padding:0.4rem 0.7rem;
+    text-align:center;
+    min-height:1.2em;
+    margin-bottom:0.5rem;
+  }
+  .trend-tooltip .value{ font-weight:600; }
+  .trend-tooltip.placeholder{ color:var(--on-surface-variant); }
+  .trend-svg{ width:100%; display:block; touch-action:manipulation; }
+  .mood-level-tag{
+    display:inline-flex;
+    align-items:center;
+    gap:0.4rem;
+  }
+  .mood-level-tag .swatch{
+    width:10px;
+    height:10px;
+    border-radius:9999px;
+    flex:0 0 auto;
+    box-shadow:0 0 0 2px var(--surface-container);
+  }
+
+  /* ---- Bottom nav ---- */
+  .bottom-nav{
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:0;
+    display:flex;
+    justify-content:center;
+    background:rgba(16,20,24,0.85);
+    backdrop-filter:blur(16px);
+    border-top:1px solid rgba(255,255,255,0.06);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  .bottom-nav-inner{
+    width:100%;
+    max-width:480px;
+    display:flex;
+  }
+  .nav-item{
+    flex:1;
+    appearance:none;
+    background:transparent;
+    border:none;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:0.25rem;
+    padding:0.75rem 0 calc(0.6rem);
+    color:var(--on-surface-variant);
+    font-family:inherit;
+    font-size:11px;
+    font-weight:500;
+    cursor:pointer;
+  }
+  .nav-item.active{ color:var(--primary); }
+  .nav-item svg{ width:22px; height:22px; }
 </style>
 </head>
 <body>
   <div class="app">
-    <header>
-      <h1>Daily Log</h1>
-    </header>
 
-    <div class="status-card">
-      <div class="label">前回の記録からの経過</div>
-      <div class="elapsed" id="elapsed">記録がありません</div>
-      <div class="since" id="since"></div>
-    </div>
+    <section class="screen" id="screen-record">
+      <header>
+        <h1>Daily Log</h1>
+      </header>
 
-    <button class="log-button" id="logButton">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
-      記録する
-    </button>
+      <div class="status-card">
+        <div class="label">前回の記録からの経過</div>
+        <div class="elapsed" id="elapsed">記録がありません</div>
+        <div class="since" id="since"></div>
+      </div>
 
-    <div class="history-header">
-      <h2>履歴</h2>
-      <span class="count" id="historyCount"></span>
-    </div>
-    <ul class="history-list" id="historyList"></ul>
+      <button class="primary-button" id="logButton">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+        記録する
+      </button>
+
+      <div class="section-header">
+        <h2>履歴</h2>
+        <span class="count" id="historyCount"></span>
+      </div>
+      <ul class="list" id="historyList"></ul>
+    </section>
+
+    <section class="screen" id="screen-mood" hidden>
+      <header>
+        <h1>気分</h1>
+        <p class="subtitle">思い立った時に、今の気分を記録できます</p>
+      </header>
+
+      <p class="mood-prompt">今の気分は？</p>
+      <div class="mood-picker">
+        <div class="mood-scale" id="moodScale">
+          <button class="mood-dot" data-level="1">1</button>
+          <button class="mood-dot" data-level="2">2</button>
+          <button class="mood-dot" data-level="3">3</button>
+          <button class="mood-dot" data-level="4">4</button>
+          <button class="mood-dot" data-level="5">5</button>
+        </div>
+        <div class="mood-scale-labels">
+          <span>つらい</span>
+          <span>良い</span>
+        </div>
+      </div>
+      <div class="mood-toast" id="moodToast"></div>
+
+      <div class="trend-card">
+        <div class="section-header">
+          <h2>推移</h2>
+          <span class="count" id="moodTrendRange"></span>
+        </div>
+        <div class="trend-tooltip placeholder" id="trendTooltip">点をタップすると詳細を表示します</div>
+        <svg class="trend-svg" id="trendSvg" viewBox="0 0 320 120" preserveAspectRatio="none"></svg>
+      </div>
+
+      <div class="section-header">
+        <h2>履歴</h2>
+        <span class="count" id="moodHistoryCount"></span>
+      </div>
+      <ul class="list" id="moodHistoryList"></ul>
+    </section>
+
   </div>
+
+  <nav class="bottom-nav">
+    <div class="bottom-nav-inner">
+      <button class="nav-item active" data-tab="record">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M9 12.5l2 2 4.5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/></svg>
+        記録
+      </button>
+      <button class="nav-item" data-tab="mood">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 12h4l2 6 4-12 2 6h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        気分
+      </button>
+    </div>
+  </nav>
 
 <script>
 (function(){
-  const STORAGE_KEY = 'daily-private-memo.records';
-
-  function loadRecords(){
+  /* ---------------- shared helpers ---------------- */
+  function loadArray(key){
     try{
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(key);
       const arr = raw ? JSON.parse(raw) : [];
-      return Array.isArray(arr) ? arr.sort((a,b) => b - a) : [];
+      return Array.isArray(arr) ? arr : [];
     }catch(e){
       return [];
     }
   }
-
-  function saveRecords(records){
-    try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-    }catch(e){ /* storage unavailable, ignore */ }
+  function saveArray(key, arr){
+    try{ localStorage.setItem(key, JSON.stringify(arr)); }catch(e){ /* ignore */ }
   }
-
-  let records = loadRecords();
-
   function formatDateTime(ts){
     const d = new Date(ts);
     const m = d.getMonth()+1, day = d.getDate();
@@ -221,6 +416,29 @@
     const mm = String(d.getMinutes()).padStart(2,'0');
     return `${m}/${day} ${hh}:${mm}`;
   }
+
+  /* ---------------- tab switching ---------------- */
+  const screens = {
+    record: document.getElementById('screen-record'),
+    mood: document.getElementById('screen-mood'),
+  };
+  const navItems = document.querySelectorAll('.nav-item');
+  function showTab(tab){
+    Object.keys(screens).forEach(key => {
+      screens[key].hidden = key !== tab;
+    });
+    navItems.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    if (tab === 'mood') renderMoodTrend();
+  }
+  navItems.forEach(btn => {
+    btn.addEventListener('click', () => showTab(btn.dataset.tab));
+  });
+
+  /* ---------------- record screen ---------------- */
+  const RECORDS_KEY = 'daily-private-memo.records';
+  let records = loadArray(RECORDS_KEY).sort((a,b) => b - a);
 
   function formatElapsed(ms){
     if (ms < 0) ms = 0;
@@ -232,13 +450,14 @@
     if (hours > 0) return `${hours}時間 ${mins}分`;
     return `${mins}分`;
   }
-
   function formatIntervalLabel(ms){
     const totalMin = Math.floor(ms / 60000);
     const days = Math.floor(totalMin / 1440);
     const hours = Math.floor((totalMin % 1440) / 60);
+    const mins = totalMin % 60;
     if (days > 0) return `間隔: ${days}日${hours > 0 ? ' '+hours+'時間' : ''}`;
-    return `間隔: ${hours}時間`;
+    if (hours > 0) return `間隔: ${hours}時間${mins > 0 ? ' '+mins+'分' : ''}`;
+    return `間隔: ${mins}分`;
   }
 
   const elapsedEl = document.getElementById('elapsed');
@@ -247,9 +466,7 @@
   const historyCountEl = document.getElementById('historyCount');
   const logButton = document.getElementById('logButton');
 
-  let tickTimer = null;
-
-  function renderStatus(){
+  function renderRecordStatus(){
     if (records.length === 0){
       elapsedEl.textContent = '記録がありません';
       sinceEl.textContent = '';
@@ -260,7 +477,7 @@
     sinceEl.textContent = `最終記録: ${formatDateTime(last)}`;
   }
 
-  function renderHistory(){
+  function renderRecordHistory(){
     historyListEl.innerHTML = '';
     historyCountEl.textContent = records.length > 0 ? `${records.length}件` : '';
 
@@ -274,7 +491,7 @@
 
     records.forEach((ts, idx) => {
       const li = document.createElement('li');
-      li.className = 'history-item';
+      li.className = 'list-item';
 
       const left = document.createElement('div');
       const dt = document.createElement('div');
@@ -290,13 +507,14 @@
       }
 
       const delBtn = document.createElement('button');
+      delBtn.className = 'delete';
       delBtn.setAttribute('aria-label', '削除');
       delBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m-7 0v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       delBtn.addEventListener('click', () => {
         if (confirm('この記録を削除しますか？')){
           records = records.filter(r => r !== ts);
-          saveRecords(records);
-          render();
+          saveArray(RECORDS_KEY, records);
+          renderRecord();
         }
       });
 
@@ -306,24 +524,196 @@
     });
   }
 
-  function render(){
-    renderStatus();
-    renderHistory();
-  }
-
-  function startTicking(){
-    if (tickTimer) clearInterval(tickTimer);
-    tickTimer = setInterval(renderStatus, 30000);
+  function renderRecord(){
+    renderRecordStatus();
+    renderRecordHistory();
   }
 
   logButton.addEventListener('click', () => {
     records.unshift(Date.now());
-    saveRecords(records);
-    render();
+    saveArray(RECORDS_KEY, records);
+    renderRecord();
   });
 
-  render();
-  startTicking();
+  setInterval(renderRecordStatus, 30000);
+
+  /* ---------------- mood screen ---------------- */
+  const MOODS_KEY = 'daily-private-memo.moods';
+  // entries: [{ts, level}], newest first
+  let moods = loadArray(MOODS_KEY).sort((a,b) => b.ts - a.ts);
+
+  const MOOD_COLORS = { 1:'var(--mood-1)', 2:'var(--mood-2)', 3:'var(--mood-3)', 4:'var(--mood-4)', 5:'var(--mood-5)' };
+  const MOOD_LABELS = { 1:'つらい', 2:'やや不安定', 3:'ふつう', 4:'やや良い', 5:'良い' };
+
+  const moodToastEl = document.getElementById('moodToast');
+  const moodHistoryListEl = document.getElementById('moodHistoryList');
+  const moodHistoryCountEl = document.getElementById('moodHistoryCount');
+  const moodTrendRangeEl = document.getElementById('moodTrendRange');
+  const trendSvg = document.getElementById('trendSvg');
+  const trendTooltip = document.getElementById('trendTooltip');
+
+  let toastTimer = null;
+  function showToast(text){
+    moodToastEl.textContent = text;
+    moodToastEl.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => moodToastEl.classList.remove('show'), 1600);
+  }
+
+  document.querySelectorAll('.mood-dot').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const level = Number(btn.dataset.level);
+      moods.unshift({ ts: Date.now(), level });
+      saveArray(MOODS_KEY, moods);
+      showToast(`記録しました（${MOOD_LABELS[level]}）`);
+      renderMoodHistory();
+      renderMoodTrend();
+    });
+  });
+
+  function renderMoodHistory(){
+    moodHistoryListEl.innerHTML = '';
+    moodHistoryCountEl.textContent = moods.length > 0 ? `${moods.length}件` : '';
+
+    if (moods.length === 0){
+      const li = document.createElement('li');
+      li.className = 'empty-state';
+      li.textContent = 'まだ記録がありません。上のボタンから気分を記録してみましょう。';
+      moodHistoryListEl.appendChild(li);
+      return;
+    }
+
+    moods.forEach(entry => {
+      const li = document.createElement('li');
+      li.className = 'list-item';
+
+      const left = document.createElement('div');
+      left.className = 'left';
+
+      const tag = document.createElement('span');
+      tag.className = 'mood-level-tag';
+      const swatch = document.createElement('span');
+      swatch.className = 'swatch';
+      swatch.style.background = MOOD_COLORS[entry.level];
+      const label = document.createElement('span');
+      label.className = 'datetime';
+      label.textContent = `${formatDateTime(entry.ts)} ・ ${MOOD_LABELS[entry.level]}`;
+      tag.appendChild(swatch);
+      tag.appendChild(label);
+      left.appendChild(tag);
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'delete';
+      delBtn.setAttribute('aria-label', '削除');
+      delBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m-7 0v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      delBtn.addEventListener('click', () => {
+        if (confirm('この記録を削除しますか？')){
+          moods = moods.filter(m => m !== entry);
+          saveArray(MOODS_KEY, moods);
+          renderMoodHistory();
+          renderMoodTrend();
+        }
+      });
+
+      li.appendChild(left);
+      li.appendChild(delBtn);
+      moodHistoryListEl.appendChild(li);
+    });
+  }
+
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const CHART_W = 320, CHART_H = 120, PAD_X = 14, PAD_Y = 14;
+  const MAX_POINTS = 20;
+
+  function renderMoodTrend(){
+    trendSvg.innerHTML = '';
+    const points = moods.slice(0, MAX_POINTS).slice().reverse(); // oldest -> newest, left -> right
+
+    if (points.length === 0){
+      moodTrendRangeEl.textContent = '';
+      trendTooltip.textContent = '記録が増えると、ここに推移が表示されます';
+      trendTooltip.classList.add('placeholder');
+      return;
+    }
+
+    moodTrendRangeEl.textContent = `直近${points.length}件`;
+
+    const plotW = CHART_W - PAD_X * 2;
+    const plotH = CHART_H - PAD_Y * 2;
+    const xFor = i => points.length === 1
+      ? CHART_W / 2
+      : PAD_X + (plotW * i) / (points.length - 1);
+    const yFor = level => PAD_Y + plotH * (5 - level) / 4;
+
+    // recessive reference line at the midpoint (level 3)
+    const gridLine = document.createElementNS(SVG_NS, 'line');
+    gridLine.setAttribute('x1', PAD_X);
+    gridLine.setAttribute('x2', CHART_W - PAD_X);
+    gridLine.setAttribute('y1', yFor(3));
+    gridLine.setAttribute('y2', yFor(3));
+    gridLine.setAttribute('stroke', 'var(--outline)');
+    gridLine.setAttribute('stroke-width', '1');
+    trendSvg.appendChild(gridLine);
+
+    // connecting line (2px, muted — the marks, not the line, carry the value color)
+    const path = document.createElementNS(SVG_NS, 'polyline');
+    path.setAttribute('points', points.map((p, i) => `${xFor(i)},${yFor(p.level)}`).join(' '));
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'var(--on-surface-variant)');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('stroke-linejoin', 'round');
+    path.setAttribute('stroke-linecap', 'round');
+    trendSvg.appendChild(path);
+
+    points.forEach((p, i) => {
+      const cx = xFor(i), cy = yFor(p.level);
+
+      const dot = document.createElementNS(SVG_NS, 'circle');
+      dot.setAttribute('cx', cx);
+      dot.setAttribute('cy', cy);
+      dot.setAttribute('r', 5);
+      dot.setAttribute('fill', MOOD_COLORS[p.level]);
+      dot.setAttribute('stroke', 'var(--surface-container-low)');
+      dot.setAttribute('stroke-width', '2');
+      trendSvg.appendChild(dot);
+
+      // enlarged transparent hit target (~24px) for reliable tapping
+      const hit = document.createElementNS(SVG_NS, 'circle');
+      hit.setAttribute('cx', cx);
+      hit.setAttribute('cy', cy);
+      hit.setAttribute('r', 12);
+      hit.setAttribute('fill', 'transparent');
+      hit.style.cursor = 'pointer';
+      hit.addEventListener('click', () => {
+        trendTooltip.classList.remove('placeholder');
+        trendTooltip.innerHTML = '';
+        const valueSpan = document.createElement('span');
+        valueSpan.className = 'value';
+        valueSpan.textContent = `${MOOD_LABELS[p.level]}（${p.level}） `;
+        const dateSpan = document.createElement('span');
+        dateSpan.textContent = formatDateTime(p.ts);
+        trendTooltip.appendChild(valueSpan);
+        trendTooltip.appendChild(dateSpan);
+      });
+      trendSvg.appendChild(hit);
+    });
+
+    // default: show the most recent point's detail
+    const last = points[points.length - 1];
+    trendTooltip.classList.remove('placeholder');
+    trendTooltip.innerHTML = '';
+    const valueSpan = document.createElement('span');
+    valueSpan.className = 'value';
+    valueSpan.textContent = `${MOOD_LABELS[last.level]}（${last.level}） `;
+    const dateSpan = document.createElement('span');
+    dateSpan.textContent = formatDateTime(last.ts);
+    trendTooltip.appendChild(valueSpan);
+    trendTooltip.appendChild(dateSpan);
+  }
+
+  /* ---------------- init ---------------- */
+  renderRecord();
+  renderMoodHistory();
 })();
 </script>
 </body>
