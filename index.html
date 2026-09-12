@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Daily Log" />
 <meta name="theme-color" content="#0f766e" />
-<meta name="app-build" content="20260912-1657" />
+<meta name="app-build" content="20260912-1705" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -260,44 +260,53 @@
     margin-bottom:1.5rem;
   }
   /* One tap on a row = saved immediately, same as the old dot row. */
+  /* One horizontally-scrollable row — every option stays on a single
+     line, no wrap to a second row of chips. */
   .choice-list{
-    display:grid;
-    grid-template-columns:repeat(auto-fit, minmax(58px, 1fr));
-    gap:0.5rem;
+    display:flex;
+    flex-direction:row;
+    flex-wrap:nowrap;
+    overflow-x:auto;
+    gap:0.45rem;
+    padding-bottom:0.15rem;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
   }
+  .choice-list::-webkit-scrollbar{ display:none; }
   .choice-row{
     appearance:none;
     border:none;
     cursor:pointer;
+    flex:0 0 auto;
     display:flex;
-    flex-direction:column;
+    flex-direction:row;
     align-items:center;
-    gap:0.35rem;
-    padding:0.65rem 0.25rem;
-    border-radius:1.1rem;
+    gap:0.4rem;
+    padding:0.4rem 0.85rem 0.4rem 0.4rem;
+    border-radius:9999px;
     background:var(--surface-container);
     font-family:inherit;
-    text-align:center;
+    white-space:nowrap;
     transition:transform 0.08s ease;
   }
   .choice-row:active{ transform:scale(0.96); }
   .choice-row.selected{ box-shadow:0 0 0 2px var(--primary) inset; }
   .choice-badge{
     flex:0 0 auto;
-    width:32px;
-    height:32px;
+    width:28px;
+    height:28px;
     border-radius:9999px;
     display:flex;
     align-items:center;
     justify-content:center;
-    font-size:14px;
+    font-size:13px;
     font-weight:700;
   }
   .choice-label{
-    font-size:10.5px;
-    line-height:1.25;
+    font-size:13px;
     font-weight:500;
     color:var(--on-surface);
+    white-space:nowrap;
   }
   .mood-toast{
     text-align:center;
@@ -1241,6 +1250,12 @@
   const ANXIETY_LABELS = {
     0:'不安なし', 1:'少し不安', 2:'やや不安', 3:'強い不安', 4:'非常に強い不安'
   };
+  // Shorter labels for the picker only (the "不安" section heading already
+  // says what's being rated, so repeating it on every chip is redundant) —
+  // history/tooltips keep the full ANXIETY_LABELS above.
+  const ANXIETY_PICKER_LABELS = {
+    0:'なし', 1:'少し', 2:'やや', 3:'強い', 4:'非常に強い'
+  };
   function hasAnxiety(entry){ return typeof entry.anxiety === 'number'; }
 
   // Builds a vertical list of tappable "number + label" rows (used for
@@ -1455,7 +1470,7 @@
     openDetailPanelFor(entry, level);
   });
 
-  buildChoiceList(anxietyListEl, ANXIETY_MIN, ANXIETY_MAX, ANXIETY_COLORS, ANXIETY_TEXT_COLORS, ANXIETY_LABELS, (level, btn) => {
+  buildChoiceList(anxietyListEl, ANXIETY_MIN, ANXIETY_MAX, ANXIETY_COLORS, ANXIETY_TEXT_COLORS, ANXIETY_PICKER_LABELS, (level, btn) => {
     if (!activeDetailEntry) return;
     activeDetailEntry.anxiety = level;
     saveArray(MOODS_KEY, moods);
