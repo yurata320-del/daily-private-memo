@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Daily Log" />
 <meta name="theme-color" content="#0f766e" />
-<meta name="app-build" content="20260912-1" />
+<meta name="app-build" content="20260912-0941" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,14 +36,16 @@
     --accent-a: #0f766e;
     --accent-b: #0e7490;
     --error: #e11d48;
-    /* Mood ordinal ramp — one hue, monotone lightness, validated against the
-       white card surface with scripts/validate_palette.js --ordinal
-       (light→dark order below). */
-    --mood-1: #7fbfb2;
-    --mood-2: #5cae9f;
-    --mood-3: #3d9c8c;
-    --mood-4: #237f70;
-    --mood-5: #0f6355;
+    /* Mood ordinal ramp (7 steps, 0–6) — one hue, monotone lightness,
+       validated against the white card surface with
+       scripts/validate_palette.js --ordinal (light→dark order below). */
+    --mood-0: #7fbfb2;
+    --mood-1: #5cae9f;
+    --mood-2: #3d9c8c;
+    --mood-3: #237f70;
+    --mood-4: #0f6355;
+    --mood-5: #073f37;
+    --mood-6: #03241e;
   }
   *{box-sizing:border-box;}
   html,body{
@@ -108,12 +110,39 @@
     font-weight:600;
     letter-spacing:-0.02em;
     font-variant-numeric: tabular-nums;
+    transition:color 0.2s ease;
+  }
+  .status-card .elapsed.urgent{
+    color:var(--error);
+    font-style:italic;
+    font-weight:800;
+    animation:urgentPulse 1.6s ease-in-out infinite;
   }
   .status-card .since{
     margin-top:0.5rem;
     font-size:12px;
     color:var(--on-surface-variant);
   }
+  @keyframes urgentPulse{
+    0%,100%{ opacity:1; }
+    50%{ opacity:0.5; }
+  }
+  .urgent-banner{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:0.5rem;
+    background:linear-gradient(135deg, #e11d48, #f43f5e);
+    color:#ffffff;
+    font-weight:700;
+    font-size:14px;
+    padding:0.85rem 1rem;
+    border-radius:1.25rem;
+    margin:-1rem 0 2rem;
+    box-shadow:0 8px 20px rgba(225,29,72,0.35);
+    animation:urgentPulse 1.6s ease-in-out infinite;
+  }
+  .urgent-banner[hidden]{ display:none; }
   .primary-button{
     appearance:none;
     border:none;
@@ -225,30 +254,33 @@
     display:flex;
     align-items:center;
     justify-content:space-between;
-    gap:0.5rem;
+    gap:0.3rem;
   }
   .mood-dot{
     appearance:none;
     border:none;
     cursor:pointer;
-    width:52px;
-    height:52px;
+    flex:1 1 0;
+    min-width:0;
+    aspect-ratio:1/1;
+    max-width:46px;
     border-radius:9999px;
     font-family:inherit;
-    font-size:16px;
+    font-size:13px;
     font-weight:600;
     display:flex;
     align-items:center;
     justify-content:center;
     transition:transform 0.08s ease;
-    flex:0 0 auto;
   }
   .mood-dot:active{ transform:scale(0.92); }
+  .mood-dot[data-level="0"]{ background:var(--mood-0); color:var(--on-surface); }
   .mood-dot[data-level="1"]{ background:var(--mood-1); color:var(--on-surface); }
   .mood-dot[data-level="2"]{ background:var(--mood-2); color:var(--on-surface); }
-  .mood-dot[data-level="3"]{ background:var(--mood-3); color:var(--on-surface); }
+  .mood-dot[data-level="3"]{ background:var(--mood-3); color:#ffffff; }
   .mood-dot[data-level="4"]{ background:var(--mood-4); color:#ffffff; }
   .mood-dot[data-level="5"]{ background:var(--mood-5); color:#ffffff; }
+  .mood-dot[data-level="6"]{ background:var(--mood-6); color:#ffffff; }
   .mood-scale-labels{
     display:flex;
     justify-content:space-between;
@@ -416,6 +448,34 @@
   }
   .reset-link:hover{ color:var(--error); }
 
+  .granularity-toggle{
+    display:flex;
+    gap:0.25rem;
+    background:var(--surface-container-high);
+    padding:0.25rem;
+    border-radius:9999px;
+    margin:0 0.25rem 0.75rem;
+  }
+  .granularity-toggle button{
+    flex:1;
+    appearance:none;
+    border:none;
+    background:transparent;
+    color:var(--on-surface-variant);
+    font-family:inherit;
+    font-size:12px;
+    font-weight:600;
+    padding:0.4rem 0;
+    border-radius:9999px;
+    cursor:pointer;
+    transition:background 0.15s ease, color 0.15s ease;
+  }
+  .granularity-toggle button.active{
+    background:linear-gradient(135deg, var(--accent-a), var(--accent-b));
+    color:#ffffff;
+    box-shadow:0 4px 10px rgba(15,118,110,0.28);
+  }
+
   /* ---- Bottom nav ---- */
   .bottom-nav{
     position:fixed;
@@ -518,6 +578,8 @@
         <div class="since" id="since"></div>
       </div>
 
+      <div class="urgent-banner" id="urgentBanner" hidden>⚠️ 今すぐすべし</div>
+
       <button class="primary-button" id="logButton">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
         記録する
@@ -539,15 +601,17 @@
       <p class="mood-prompt">今の気分は？</p>
       <div class="mood-picker">
         <div class="mood-scale" id="moodScale">
+          <button class="mood-dot" data-level="0">0</button>
           <button class="mood-dot" data-level="1">1</button>
           <button class="mood-dot" data-level="2">2</button>
           <button class="mood-dot" data-level="3">3</button>
           <button class="mood-dot" data-level="4">4</button>
           <button class="mood-dot" data-level="5">5</button>
+          <button class="mood-dot" data-level="6">6</button>
         </div>
         <div class="mood-scale-labels">
-          <span>つらい</span>
-          <span>良い</span>
+          <span>制御不能</span>
+          <span>最高ぶっ飛び</span>
         </div>
       </div>
       <div class="mood-toast" id="moodToast"></div>
@@ -610,8 +674,14 @@
 
       <div class="chart-card">
         <div class="section-header">
-          <h2>推移（日別平均）</h2>
+          <h2>推移</h2>
           <span class="count" id="trendRangeLabel"></span>
+        </div>
+        <div class="granularity-toggle" id="trendGranularityToggle">
+          <button data-granularity="day" class="active">日</button>
+          <button data-granularity="week">週</button>
+          <button data-granularity="month">月</button>
+          <button data-granularity="year">年</button>
         </div>
         <div class="chart-tooltip placeholder" id="analysisTooltip">点をタップすると詳細を表示します</div>
         <svg class="chart-svg" id="analysisSvg" viewBox="0 0 320 130" preserveAspectRatio="none"></svg>
@@ -728,8 +798,33 @@
     return el;
   }
 
-  const MOOD_COLORS = { 1:'var(--mood-1)', 2:'var(--mood-2)', 3:'var(--mood-3)', 4:'var(--mood-4)', 5:'var(--mood-5)' };
-  const MOOD_LABELS = { 1:'つらい', 2:'やや不安定', 3:'ふつう', 4:'やや良い', 5:'良い' };
+  // Graphical touch: a soft vertical wash under a line chart, from the
+  // brand teal→cyan gradient fading to fully transparent at the baseline
+  // (mark spec: area fill is a wash, never a saturated block).
+  function appendAreaGradientFill(svg, points, baselineY, gradId){
+    const defs = svgEl('defs', {});
+    const grad = svgEl('linearGradient', { id: gradId, x1:'0', y1:'0', x2:'0', y2:'1' });
+    grad.appendChild(svgEl('stop', { offset:'0%', 'stop-color':'#0e7490', 'stop-opacity':'0.28' }));
+    grad.appendChild(svgEl('stop', { offset:'100%', 'stop-color':'#0f766e', 'stop-opacity':'0' }));
+    defs.appendChild(grad);
+    svg.appendChild(defs);
+
+    const areaPoints = points.map(p => ({ x:p.x, y:p.y }));
+    const d = smoothPathD(areaPoints) +
+      ` L ${areaPoints[areaPoints.length-1].x} ${baselineY}` +
+      ` L ${areaPoints[0].x} ${baselineY} Z`;
+    svg.appendChild(svgEl('path', { d, fill:`url(#${gradId})`, stroke:'none' }));
+  }
+
+  const MOOD_MIN = 0, MOOD_MAX = 6, MOOD_MID = 3;
+  const MOOD_COLORS = {
+    0:'var(--mood-0)', 1:'var(--mood-1)', 2:'var(--mood-2)', 3:'var(--mood-3)',
+    4:'var(--mood-4)', 5:'var(--mood-5)', 6:'var(--mood-6)'
+  };
+  const MOOD_LABELS = {
+    0:'制御不能', 1:'つらい', 2:'やや不安定', 3:'ふつう',
+    4:'やや良い', 5:'良い', 6:'最高ぶっ飛び'
+  };
 
   /* ---------------- tab switching ---------------- */
   const screens = {
@@ -781,16 +876,26 @@
   const historyListEl = document.getElementById('historyList');
   const historyCountEl = document.getElementById('historyCount');
   const logButton = document.getElementById('logButton');
+  const urgentBannerEl = document.getElementById('urgentBanner');
+
+  const HOUR_MS = 60*60*1000;
+  const URGENT_COLOR_THRESHOLD_MS = 24*HOUR_MS;
+  const URGENT_ALERT_THRESHOLD_MS = 36*HOUR_MS;
 
   function renderRecordStatus(){
     if (records.length === 0){
       elapsedEl.textContent = '記録がありません';
+      elapsedEl.classList.remove('urgent');
       sinceEl.textContent = '';
+      urgentBannerEl.hidden = true;
       return;
     }
     const last = records[0];
-    elapsedEl.textContent = formatElapsed(Date.now() - last);
+    const elapsedMs = Date.now() - last;
+    elapsedEl.textContent = formatElapsed(elapsedMs);
     sinceEl.textContent = `最終記録: ${formatDateTime(last)}`;
+    elapsedEl.classList.toggle('urgent', elapsedMs >= URGENT_COLOR_THRESHOLD_MS);
+    urgentBannerEl.hidden = elapsedMs < URGENT_ALERT_THRESHOLD_MS;
   }
 
   function renderRecordHistory(){
@@ -978,7 +1083,7 @@
     const plotW = DAY_W - DAY_PAD_X * 2;
     const plotH = DAY_H - DAY_PAD_Y - DAY_PAD_BOTTOM;
     const xForHour = h => DAY_PAD_X + plotW * (h / 24);
-    const yForLevel = level => DAY_PAD_Y + plotH * (5 - level) / 4;
+    const yForLevel = level => DAY_PAD_Y + plotH * (MOOD_MAX - level) / (MOOD_MAX - MOOD_MIN);
 
     // hour gridlines (0/6/12/18/24) — recessive hairlines + labels
     [0,6,12,18,24].forEach(h => {
@@ -1015,6 +1120,8 @@
     }));
 
     if (points.length >= 2){
+      const baseline = DAY_PAD_Y + plotH;
+      appendAreaGradientFill(daySvg, points, baseline, 'dayAreaGrad');
       const path = svgEl('path', {
         d: smoothPathD(points),
         fill:'none', stroke:'var(--on-surface-variant)', 'stroke-width':'2',
@@ -1062,6 +1169,7 @@
   const analysisSvg = document.getElementById('analysisSvg');
   const analysisTooltip = document.getElementById('analysisTooltip');
   const timeOfDaySvg = document.getElementById('timeOfDaySvg');
+  const trendToggleEl = document.getElementById('trendGranularityToggle');
 
   function mean(arr){ return arr.reduce((s,v) => s+v, 0) / arr.length; }
   function stdev(arr){
@@ -1071,6 +1179,72 @@
   }
 
   const DAY_MS = 24*60*60*1000;
+
+  /* ---- trend granularity: 日/週/月/年 ---- */
+  let trendGranularity = 'day';
+
+  function weekKeyMonday(ts){
+    const d = new Date(ts);
+    const dow = d.getDay(); // 0=Sun..6=Sat
+    const diffToMonday = (dow === 0 ? -6 : 1 - dow);
+    const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diffToMonday, 0,0,0,0);
+    return localDateStr(monday.getTime());
+  }
+  function monthKey(ts){
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  }
+  function yearKey(ts){ return String(new Date(ts).getFullYear()); }
+
+  const TREND_CAPS = { day:30, week:20, month:18, year:10 };
+  const TREND_UNIT_LABEL = { day:'日', week:'週', month:'ヶ月', year:'年' };
+
+  function buildTrendPoints(granularity){
+    const keyFn = { day: localDateStr, week: weekKeyMonday, month: monthKey, year: yearKey }[granularity];
+    const map = new Map();
+    moods.forEach(m => {
+      const key = keyFn(m.ts);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(m.level);
+    });
+    return Array.from(map.entries())
+      .map(([key, lv]) => ({ key, avg: mean(lv), granularity }))
+      .sort((a,b) => a.key.localeCompare(b.key))
+      .slice(-TREND_CAPS[granularity]);
+  }
+
+  function formatTrendLabel(point){
+    const g = point.granularity;
+    if (g === 'day'){
+      const [, m, d] = point.key.split('-').map(Number);
+      return `${m}/${d}`;
+    }
+    if (g === 'week'){
+      const [, m, d] = point.key.split('-').map(Number);
+      return `${m}/${d}週`;
+    }
+    if (g === 'month'){
+      const [y, m] = point.key.split('-').map(Number);
+      return `${y}/${m}`;
+    }
+    return `${point.key}年`;
+  }
+
+  function updateTrendChart(){
+    const trendPoints = buildTrendPoints(trendGranularity);
+    trendRangeLabelEl.textContent = trendPoints.length > 0
+      ? `${trendPoints.length}${TREND_UNIT_LABEL[trendGranularity]}分`
+      : '';
+    renderTrendChart(trendPoints);
+  }
+
+  trendToggleEl.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      trendGranularity = btn.dataset.granularity;
+      trendToggleEl.querySelectorAll('button').forEach(b => b.classList.toggle('active', b === btn));
+      updateTrendChart();
+    });
+  });
 
   function renderAnalysis(){
     if (moods.length === 0){
@@ -1091,23 +1265,21 @@
     statAvgEl.textContent = mean(levels).toFixed(1);
     statCountEl.textContent = String(moods.length);
 
+    // thresholds scaled for the 0–6 range (was 0.6/1.2 on the old 1–5 range)
     const sd = stdev(levels);
-    statVolatilityEl.textContent = sd < 0.6 ? '安定' : (sd < 1.2 ? 'やや変動' : '変動大');
+    statVolatilityEl.textContent = sd < 0.9 ? '安定' : (sd < 1.8 ? 'やや変動' : '変動大');
 
-    // ---- daily average trend (last up to 30 days that have data) ----
+    // ---- trend (日/週/月/年 — see trendGranularity) ----
+    // byDate (always per calendar day) is also what the 記録-correlation
+    // comparison below groups by, regardless of the chart's granularity.
     const byDate = new Map();
     moods.forEach(m => {
       const key = localDateStr(m.ts);
       if (!byDate.has(key)) byDate.set(key, []);
       byDate.get(key).push(m.level);
     });
-    const dailyPoints = Array.from(byDate.entries())
-      .map(([date, lv]) => ({ date, avg: mean(lv) }))
-      .sort((a,b) => a.date.localeCompare(b.date))
-      .slice(-30);
 
-    trendRangeLabelEl.textContent = dailyPoints.length > 0 ? `${dailyPoints.length}日分` : '';
-    renderTrendChart(dailyPoints);
+    updateTrendChart();
 
     // ---- time-of-day pattern ----
     const buckets = { '朝':[], '昼':[], '夕':[], '夜':[] };
@@ -1129,7 +1301,7 @@
     if (recent7.length > 0 && prior7.length > 0){
       const a = mean(recent7), b = mean(prior7);
       const diff = a - b;
-      if (Math.abs(diff) < 0.3){
+      if (Math.abs(diff) < 0.45){
         insightCardEl.innerHTML = `直近7日間の平均気分は <strong>${a.toFixed(1)}</strong> で、その前の週（${b.toFixed(1)}）とほぼ同じ水準です。`;
       } else if (diff > 0){
         insightCardEl.innerHTML = `直近7日間の平均気分は <strong>${a.toFixed(1)}</strong> で、その前の週（${b.toFixed(1)}）より落ち着いています。`;
@@ -1168,7 +1340,7 @@
     const avgWithout = mean(withoutRecord);
     const diff = avgWith - avgWithout;
     let comment;
-    if (Math.abs(diff) < 0.3){
+    if (Math.abs(diff) < 0.45){
       comment = `今のところ、はっきりした違いは見られません。`;
     } else if (diff > 0){
       comment = `「記録」があった日の方が、気分が高い傾向があります。`;
@@ -1184,9 +1356,21 @@
 
   const TREND_W = 320, TREND_H = 130, TREND_PAD_X = 14, TREND_PAD_Y = 14;
 
-  function renderTrendChart(dailyPoints){
+  function showTrendTooltip(point){
+    analysisTooltip.classList.remove('placeholder');
+    analysisTooltip.innerHTML = '';
+    const valueSpan = document.createElement('span');
+    valueSpan.className = 'value';
+    valueSpan.textContent = `平均 ${point.avg.toFixed(1)} `;
+    const labelSpan = document.createElement('span');
+    labelSpan.textContent = formatTrendLabel(point);
+    analysisTooltip.appendChild(valueSpan);
+    analysisTooltip.appendChild(labelSpan);
+  }
+
+  function renderTrendChart(trendPoints){
     analysisSvg.innerHTML = '';
-    if (dailyPoints.length === 0){
+    if (trendPoints.length === 0){
       analysisTooltip.classList.add('placeholder');
       analysisTooltip.textContent = '記録が増えると、ここに推移が表示されます';
       return;
@@ -1194,16 +1378,18 @@
 
     const plotW = TREND_W - TREND_PAD_X * 2;
     const plotH = TREND_H - TREND_PAD_Y * 2;
-    const xFor = i => dailyPoints.length === 1 ? TREND_W/2 : TREND_PAD_X + plotW*i/(dailyPoints.length-1);
-    const yFor = avg => TREND_PAD_Y + plotH * (5 - avg) / 4;
+    const xFor = i => trendPoints.length === 1 ? TREND_W/2 : TREND_PAD_X + plotW*i/(trendPoints.length-1);
+    const yFor = avg => TREND_PAD_Y + plotH * (MOOD_MAX - avg) / (MOOD_MAX - MOOD_MIN);
+    const baseline = TREND_PAD_Y + plotH;
 
     analysisSvg.appendChild(svgEl('line', {
-      x1:TREND_PAD_X, x2:TREND_W-TREND_PAD_X, y1:yFor(3), y2:yFor(3),
+      x1:TREND_PAD_X, x2:TREND_W-TREND_PAD_X, y1:yFor(MOOD_MID), y2:yFor(MOOD_MID),
       stroke:'var(--outline)', 'stroke-width':'1'
     }));
 
-    const points = dailyPoints.map((p,i) => ({ x:xFor(i), y:yFor(p.avg), point:p }));
+    const points = trendPoints.map((p,i) => ({ x:xFor(i), y:yFor(p.avg), point:p }));
     if (points.length >= 2){
+      appendAreaGradientFill(analysisSvg, points, baseline, 'trendAreaGrad');
       analysisSvg.appendChild(svgEl('path', {
         d: smoothPathD(points),
         fill:'none', stroke:'var(--on-surface-variant)', 'stroke-width':'2',
@@ -1211,7 +1397,7 @@
       }));
     }
     points.forEach(p => {
-      const roundedLevel = Math.max(1, Math.min(5, Math.round(p.point.avg)));
+      const roundedLevel = Math.max(MOOD_MIN, Math.min(MOOD_MAX, Math.round(p.point.avg)));
       analysisSvg.appendChild(svgEl('circle', {
         cx:p.x, cy:p.y, r:4.5,
         fill: MOOD_COLORS[roundedLevel],
@@ -1219,32 +1405,11 @@
       }));
       const hit = svgEl('circle', { cx:p.x, cy:p.y, r:12, fill:'transparent' });
       hit.style.cursor = 'pointer';
-      hit.addEventListener('click', () => {
-        analysisTooltip.classList.remove('placeholder');
-        analysisTooltip.innerHTML = '';
-        const valueSpan = document.createElement('span');
-        valueSpan.className = 'value';
-        valueSpan.textContent = `平均 ${p.point.avg.toFixed(1)} `;
-        const dateSpan = document.createElement('span');
-        const [y,m,d] = p.point.date.split('-').map(Number);
-        dateSpan.textContent = `${m}/${d}`;
-        analysisTooltip.appendChild(valueSpan);
-        analysisTooltip.appendChild(dateSpan);
-      });
+      hit.addEventListener('click', () => showTrendTooltip(p.point));
       analysisSvg.appendChild(hit);
     });
 
-    const last = points[points.length-1].point;
-    analysisTooltip.classList.remove('placeholder');
-    analysisTooltip.innerHTML = '';
-    const valueSpan = document.createElement('span');
-    valueSpan.className = 'value';
-    valueSpan.textContent = `平均 ${last.avg.toFixed(1)} `;
-    const dateSpan = document.createElement('span');
-    const [y,m,d] = last.date.split('-').map(Number);
-    dateSpan.textContent = `${m}/${d}`;
-    analysisTooltip.appendChild(valueSpan);
-    analysisTooltip.appendChild(dateSpan);
+    showTrendTooltip(points[points.length-1].point);
   }
 
   function renderTimeOfDayChart(buckets){
@@ -1254,8 +1419,15 @@
     const plotH = H - PAD_TOP - PAD_BOTTOM;
     const slotW = (W - PAD_X*2) / keys.length;
     const barW = 24;
-    const yForLevel = level => PAD_TOP + plotH * (5 - level) / 4;
+    const yForLevel = level => PAD_TOP + plotH * (MOOD_MAX - level) / (MOOD_MAX - MOOD_MIN);
     const baseline = PAD_TOP + plotH;
+
+    const defs = svgEl('defs', {});
+    const barGrad = svgEl('linearGradient', { id:'barGrad', x1:'0', y1:'0', x2:'0', y2:'1' });
+    barGrad.appendChild(svgEl('stop', { offset:'0%', 'stop-color':'#0e7490' }));
+    barGrad.appendChild(svgEl('stop', { offset:'100%', 'stop-color':'#0f766e' }));
+    defs.appendChild(barGrad);
+    timeOfDaySvg.appendChild(defs);
 
     keys.forEach((key, i) => {
       const cx = PAD_X + slotW*i + slotW/2;
@@ -1276,7 +1448,7 @@
       const top = yForLevel(avg);
       const rect = svgEl('rect', {
         x:cx-barW/2, y:top, width:barW, height:Math.max(2, baseline-top),
-        rx:4, ry:4, fill:'var(--primary)'
+        rx:4, ry:4, fill:'url(#barGrad)'
       });
       timeOfDaySvg.appendChild(rect);
 
