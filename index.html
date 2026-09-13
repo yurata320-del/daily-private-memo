@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Daily Log" />
 <meta name="theme-color" content="#0f766e" />
-<meta name="app-build" content="20260913-1700" />
+<meta name="app-build" content="20260913-1900" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,29 +36,34 @@
     --accent-a: #0f766e;
     --accent-b: #0e7490;
     --error: #e11d48;
-    /* Mood ordinal ramp (5 steps) — one hue, monotone lightness,
+    /* Mood ordinal ramp (6 steps) — one hue, monotone lightness,
        validated against the white card surface with
        scripts/validate_palette.js --ordinal (light→dark order below).
-       Reuses a subset of the original 7-step ramp's already-validated
-       colors rather than inventing new ones. Variable names stay
-       0-indexed (step 0.. step 4) as plain ramp positions; the score
-       shown on screen is 1–5 — see MOOD_COLORS in the script, which
-       maps score 1→step 0 .. score 5→step 4. */
+       Reuses the original 7-step ramp's already-validated colors
+       (dropping the one step it doesn't need) rather than inventing
+       new ones. Variable names are just ramp positions, 0..5 — the
+       score shown on screen is also 0–5, and MOOD_COLORS in the script
+       maps each score directly onto the matching step. */
     --mood-0: #7fbfb2;
-    --mood-1: #3d9c8c;
-    --mood-2: #237f70;
-    --mood-3: #0f6355;
-    --mood-4: #03241e;
-    /* Anxiety ordinal ramp (5 steps) — a separate hue (amber) from
+    --mood-1: #5cae9f;
+    --mood-2: #3d9c8c;
+    --mood-3: #237f70;
+    --mood-4: #0f6355;
+    --mood-5: #03241e;
+    /* Anxiety ordinal ramp (6 steps) — a separate hue (amber) from
        mood's teal, since the two are different measurements (dataviz:
        each series gets one hue; reusing mood's teal for a different
-       axis would read as the same quantity). Validated the same way;
-       same 0-indexed step naming, same 1–5 on-screen score. */
+       axis would read as the same quantity). --anxiety-2 is a new step
+       interpolated between the two neighbors it sits between (not
+       independently re-validated — a channel-wise midpoint between two
+       already-monotone neighbors on a single-hue ramp stays monotone
+       by construction); the rest are the original validated values. */
     --anxiety-0: #e49444;
     --anxiety-1: #d2781e;
-    --anxiety-2: #a15c17;
-    --anxiety-3: #704010;
-    --anxiety-4: #47290a;
+    --anxiety-2: #ba6a1b;
+    --anxiety-3: #a15c17;
+    --anxiety-4: #704010;
+    --anxiety-5: #47290a;
   }
   *{box-sizing:border-box;}
   html,body{
@@ -391,13 +396,23 @@
     display:flex;
     align-items:center;
     justify-content:space-between;
-    margin-bottom:0.9rem;
+    margin-bottom:0.3rem;
   }
   .detail-header .summary{
     font-size:13px;
     font-weight:600;
     color:var(--on-surface);
   }
+  /* one line of concrete detail under a level's number+label — what
+     "少し低い" or "強い不安" actually feels like, so the number isn't
+     the only thing carrying the meaning */
+  .detail-description{
+    font-size:12px;
+    color:var(--on-surface-variant);
+    line-height:1.5;
+    margin:0 0 0.9rem;
+  }
+  .detail-description:empty{ display:none; margin:0; }
   .detail-close{
     appearance:none;
     border:none;
@@ -1142,9 +1157,11 @@
           <span class="summary" id="detailSummary"></span>
           <button class="detail-close" id="detailCloseBtn" aria-label="閉じる">×</button>
         </div>
+        <p class="detail-description" id="detailDescription"></p>
 
         <p class="detail-prompt">今の不安は？（任意）</p>
         <div class="choice-list" id="anxietyList"></div>
+        <p class="detail-description" id="anxietyDescription"></p>
 
         <p class="detail-prompt second">ひとこと（任意）</p>
         <textarea class="note-input" id="noteInput" maxlength="200" placeholder="例：仕事のことを考えて不安になった"></textarea>
@@ -1205,12 +1222,12 @@
           <button type="button" data-window="90">90日</button>
         </div>
         <div class="sub-chart">
-          <div class="sub-chart-title">気分（1〜5）</div>
+          <div class="sub-chart-title">気分（0〜5）</div>
           <div class="chart-tooltip placeholder" id="analysisTooltip">点をタップすると詳細を表示します</div>
           <svg class="chart-svg" id="analysisSvg" viewBox="0 0 320 130" preserveAspectRatio="none"></svg>
         </div>
         <div class="sub-chart">
-          <div class="sub-chart-title">不安（1〜5）</div>
+          <div class="sub-chart-title">不安（0〜5）</div>
           <div class="chart-tooltip placeholder" id="anxietyTrendTooltip">点をタップすると詳細を表示します</div>
           <svg class="chart-svg" id="anxietyTrendSvg" viewBox="0 0 320 130" preserveAspectRatio="none"></svg>
         </div>
@@ -1401,48 +1418,68 @@
     dotEl.style.animationDelay = `${delayMs}ms`;
   }
 
-  // 5-point scale, scored 1–5 (not 0-indexed) so the number on screen
-  // matches the score a person would actually say out loud — anxiety
-  // uses the same 1–5 range so the two axes read as comparably-grained.
-  // The CSS ramp variables (--mood-0.. --mood-4) keep their original
-  // 0-indexed names since they're just the 5 ramp steps, not the score.
-  const MOOD_MIN = 1, MOOD_MAX = 5, MOOD_MID = 3;
+  // 6-point scale, scored 0–5 — anxiety uses the same 0–5 range so the
+  // two axes stay comparably-grained. CSS ramp step N holds the color
+  // for score N directly (no offset, unlike an earlier revision of
+  // this scale).
+  const MOOD_MIN = 0, MOOD_MAX = 5, MOOD_MID = 2.5;
   const MOOD_COLORS = {
-    1:'var(--mood-0)', 2:'var(--mood-1)', 3:'var(--mood-2)', 4:'var(--mood-3)', 5:'var(--mood-4)'
+    0:'var(--mood-0)', 1:'var(--mood-1)', 2:'var(--mood-2)', 3:'var(--mood-3)', 4:'var(--mood-4)', 5:'var(--mood-5)'
   };
-  const MOOD_TEXT_COLORS = { 1:'var(--on-surface)', 2:'var(--on-surface)', 3:'#ffffff', 4:'#ffffff', 5:'#ffffff' };
+  const MOOD_TEXT_COLORS = { 0:'var(--on-surface)', 1:'var(--on-surface)', 2:'var(--on-surface)', 3:'#ffffff', 4:'#ffffff', 5:'#ffffff' };
   const MOOD_LABELS = {
-    1:'とても悪い', 2:'悪い', 3:'普通', 4:'良い', 5:'とても良い'
+    0:'とても悪い', 1:'悪い', 2:'少し低い', 3:'普通', 4:'良い', 5:'とても良い'
+  };
+  // One short line per grade, shown next to the picker so the number
+  // has a concrete feeling attached to it instead of just a word.
+  const MOOD_DESCRIPTIONS = {
+    0:'何もしたくない、どん底の気分。',
+    1:'落ち込んでいる、イライラする、つらい。',
+    2:'なんとなく元気が出ない、疲れ気味。',
+    3:'良くも悪くもなく、落ち着いている。',
+    4:'穏やかで、ポジティブな気持ち。',
+    5:'元気いっぱいで、やる気に満ちている。'
   };
   // Small facial-expression emoji shown alongside the text label in the
   // mood history list, so a row is readable at a glance without reading
   // the words first.
-  const MOOD_EMOJI = { 1:'😞', 2:'🙁', 3:'😐', 4:'🙂', 5:'😄' };
+  const MOOD_EMOJI = { 0:'😢', 1:'😞', 2:'😕', 3:'😐', 4:'🙂', 5:'😄' };
 
-  const ANXIETY_MIN = 1, ANXIETY_MAX = 5, ANXIETY_MID = 3;
-  const ANXIETY_COLORS = { 1:'var(--anxiety-0)', 2:'var(--anxiety-1)', 3:'var(--anxiety-2)', 4:'var(--anxiety-3)', 5:'var(--anxiety-4)' };
-  const ANXIETY_TEXT_COLORS = { 1:'var(--on-surface)', 2:'var(--on-surface)', 3:'#ffffff', 4:'#ffffff', 5:'#ffffff' };
+  const ANXIETY_MIN = 0, ANXIETY_MAX = 5, ANXIETY_MID = 2.5;
+  const ANXIETY_COLORS = { 0:'var(--anxiety-0)', 1:'var(--anxiety-1)', 2:'var(--anxiety-2)', 3:'var(--anxiety-3)', 4:'var(--anxiety-4)', 5:'var(--anxiety-5)' };
+  const ANXIETY_TEXT_COLORS = { 0:'var(--on-surface)', 1:'var(--on-surface)', 2:'var(--on-surface)', 3:'#ffffff', 4:'#ffffff', 5:'#ffffff' };
   const ANXIETY_LABELS = {
-    1:'不安なし', 2:'少し不安', 3:'やや不安', 4:'強い不安', 5:'非常に強い不安'
+    0:'不安なし', 1:'わずかに不安', 2:'少し不安', 3:'やや不安', 4:'強い不安', 5:'非常に強い不安'
   };
-  const ANXIETY_EMOJI = { 1:'😌', 2:'🙂', 3:'😟', 4:'😰', 5:'😱' };
+  const ANXIETY_DESCRIPTIONS = {
+    0:'落ち着いていて、心配事がない。',
+    1:'少し気になることがある。',
+    2:'なんとなく落ち着かない。',
+    3:'そわそわして、考え事が頭から離れない。',
+    4:'動悸がする、じっとしていられない。',
+    5:'息苦しさや強い恐怖を感じる。'
+  };
+  const ANXIETY_EMOJI = { 0:'😌', 1:'🙂', 2:'😐', 3:'😟', 4:'😰', 5:'😱' };
   // Shorter labels for the picker only (the "不安" section heading already
   // says what's being rated, so repeating it on every chip is redundant) —
   // history/tooltips keep the full ANXIETY_LABELS above.
   const ANXIETY_PICKER_LABELS = {
-    1:'なし', 2:'少し', 3:'やや', 4:'強い', 5:'非常に強い'
+    0:'なし', 1:'わずか', 2:'少し', 3:'やや', 4:'強い', 5:'非常に強い'
   };
   function hasAnxiety(entry){ return typeof entry.anxiety === 'number'; }
 
   // Builds a vertical list of tappable "number + label" rows (used for
   // both the mood picker and the anxiety picker) — one tap = onSelect.
-  function buildChoiceList(container, min, max, colors, textColors, labels, onSelect){
+  function buildChoiceList(container, min, max, colors, textColors, labels, onSelect, descriptions){
     container.innerHTML = '';
     for (let level = min; level <= max; level++){
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'choice-row';
       btn.dataset.level = String(level);
+      // Hover tooltip on devices that support it — the description is
+      // otherwise only shown after tapping (see detailDescriptionEl).
+      if (descriptions && descriptions[level]) btn.title = descriptions[level];
       const badge = document.createElement('span');
       badge.className = 'choice-badge';
       badge.style.background = colors[level];
@@ -1637,6 +1674,26 @@
     try{ localStorage.setItem(FLAG, '1'); }catch(e){ /* ignore */ }
   })();
 
+  // One-time migration: mood and anxiety move from a 5-point 1–5 scale
+  // to a 6-point 0–5 scale (an extra grade inserted in the lower-middle
+  // of each — e.g. mood gains "少し低い" between "悪い" and "普通").
+  // Rescales proportionally rather than a flat shift, since the scale
+  // itself got one grade longer, not just renumbered. Runs after V3
+  // above, so mood.level and mood.anxiety are both guaranteed 1–5 by
+  // this point.
+  (function migrateScaleToSixLevel(){
+    const FLAG = 'daily-private-memo.scoreScaleMigratedV4';
+    if (localStorage.getItem(FLAG)) return;
+    const rescale = v => Math.max(0, Math.min(5, Math.round((v - 1) * 5 / 4)));
+    let changed = false;
+    moods.forEach(m => {
+      if (typeof m.level === 'number'){ m.level = rescale(m.level); changed = true; }
+      if (typeof m.anxiety === 'number'){ m.anxiety = rescale(m.anxiety); changed = true; }
+    });
+    if (changed) saveArray(MOODS_KEY, moods);
+    try{ localStorage.setItem(FLAG, '1'); }catch(e){ /* ignore */ }
+  })();
+
   const moodToastEl = document.getElementById('moodToast');
   const moodHistoryListEl = document.getElementById('moodHistoryList');
   const moodHistoryCountEl = document.getElementById('moodHistoryCount');
@@ -1646,6 +1703,8 @@
   const anxietyListEl = document.getElementById('anxietyList');
   const moodDetailPanelEl = document.getElementById('moodDetailPanel');
   const detailSummaryEl = document.getElementById('detailSummary');
+  const detailDescriptionEl = document.getElementById('detailDescription');
+  const anxietyDescriptionEl = document.getElementById('anxietyDescription');
   const detailCloseBtn = document.getElementById('detailCloseBtn');
   const noteInputEl = document.getElementById('noteInput');
   const noteSavedHintEl = document.getElementById('noteSavedHint');
@@ -1679,6 +1738,8 @@
     moodDetailPanelEl.hidden = true;
     noteInputEl.value = '';
     noteSavedHintEl.classList.remove('show');
+    detailDescriptionEl.textContent = '';
+    anxietyDescriptionEl.textContent = '';
   }
 
   function openDetailPanelFor(entry, level){
@@ -1686,9 +1747,11 @@
     detailSummaryEl.textContent = editingEntry
       ? `編集中：気分 ${level}　${MOOD_LABELS[level]}`
       : `気分 ${level}　${MOOD_LABELS[level]} を記録しました`;
+    detailDescriptionEl.textContent = MOOD_DESCRIPTIONS[level] || '';
     anxietyListEl.querySelectorAll('.choice-row').forEach(row => {
       row.classList.toggle('selected', hasAnxiety(entry) && Number(row.dataset.level) === entry.anxiety);
     });
+    anxietyDescriptionEl.textContent = hasAnxiety(entry) ? (ANXIETY_DESCRIPTIONS[entry.anxiety] || '') : '';
     noteInputEl.value = entry.note || '';
     noteSavedHintEl.classList.remove('show');
     moodDetailPanelEl.hidden = false;
@@ -1756,15 +1819,16 @@
     renderMoodHistory();
     renderMoodDay();
     openDetailPanelFor(entry, level);
-  });
+  }, MOOD_DESCRIPTIONS);
 
   buildChoiceList(anxietyListEl, ANXIETY_MIN, ANXIETY_MAX, ANXIETY_COLORS, ANXIETY_TEXT_COLORS, ANXIETY_PICKER_LABELS, (level, btn) => {
     if (!activeDetailEntry) return;
     activeDetailEntry.anxiety = level;
     saveArray(MOODS_KEY, moods);
     anxietyListEl.querySelectorAll('.choice-row').forEach(row => row.classList.toggle('selected', row === btn));
+    anxietyDescriptionEl.textContent = ANXIETY_DESCRIPTIONS[level] || '';
     renderMoodHistory();
-  });
+  }, ANXIETY_DESCRIPTIONS);
 
   detailCloseBtn.addEventListener('click', () => {
     if (editingEntry) stopEditingMoodEntry();
@@ -2996,7 +3060,7 @@
     body.appendChild(statWrap);
 
     appendTopThemesBlock(body, '不安が強い時に多いテーマ（不安4〜5）', tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 4));
-    appendTopThemesBlock(body, '気分が低い時に多いテーマ（気分1〜2）', tagged.filter(t => t.entry.level <= 2));
+    appendTopThemesBlock(body, '気分が低い時に多いテーマ（気分0〜1）', tagged.filter(t => t.entry.level <= 1));
     appendTopThemesBlock(body, '気分が良い時に多いテーマ（気分4〜5）', tagged.filter(t => t.entry.level >= 4));
   }
 
