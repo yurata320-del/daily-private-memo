@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Daily Log" />
 <meta name="theme-color" content="#0f766e" />
-<meta name="app-build" content="20260913-1200" />
+<meta name="app-build" content="20260913-1500" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -474,6 +474,27 @@
   .chart-tooltip .value{ font-weight:600; }
   .chart-tooltip.placeholder{ color:var(--on-surface-variant); }
   .chart-svg{ width:100%; display:block; touch-action:manipulation; }
+
+  /* ---- lightweight motion, used by 分析's charts/cards ---- */
+  @keyframes fadeUp{
+    from{ opacity:0; transform:translateY(6px); }
+    to{ opacity:1; transform:translateY(0); }
+  }
+  .anim-fade-up{ animation:fadeUp 0.5s cubic-bezier(0.22,1,0.36,1) both; }
+  @keyframes popIn{
+    from{ opacity:0; transform:scale(0.3); }
+    to{ opacity:1; transform:scale(1); }
+  }
+  .chart-line-draw{ transition:stroke-dashoffset 0.9s cubic-bezier(0.22,1,0.36,1); }
+  .chart-dot-pop{
+    animation:popIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+    transform-origin:center;
+    transform-box:fill-box;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .anim-fade-up, .chart-dot-pop{ animation:none !important; }
+    .chart-line-draw, .recent-metric .meter .fill, .compare-bar-row .fill{ transition:none !important; }
+  }
   .mood-level-tag{
     display:inline-flex;
     align-items:flex-start;
@@ -667,10 +688,27 @@
   }
   .recent-metric{ text-align:center; }
   .recent-metric .label{ font-size:12px; color:var(--on-surface-variant); margin-bottom:0.15rem; }
-  .recent-metric .value{ font-size:28px; font-weight:700; color:var(--on-surface); letter-spacing:-0.02em; font-variant-numeric:tabular-nums; }
+  .recent-metric .value{ font-size:28px; font-weight:700; color:var(--on-surface); letter-spacing:-0.02em; }
   .recent-metric .delta{ font-size:12px; margin-top:0.2rem; color:var(--on-surface-variant); }
   .recent-metric .delta.favorable{ color:var(--primary); font-weight:600; }
   .recent-metric .delta.unfavorable{ color:var(--error); font-weight:600; }
+  /* Meter: fill carries the value's severity (the same ordinal ramp as
+     everywhere else); the track is a flat neutral so the fill alone
+     reads as "how far along the scale". Width animates in on render so
+     the position registers as movement, not just a static number. */
+  .recent-metric .meter{
+    margin-top:0.6rem;
+    height:8px;
+    border-radius:9999px;
+    background:var(--surface-container-high);
+    overflow:hidden;
+  }
+  .recent-metric .meter .fill{
+    height:100%;
+    border-radius:9999px;
+    width:0%;
+    transition:width 0.8s cubic-bezier(0.22,1,0.36,1);
+  }
   .recent-summary{
     font-size:14px;
     line-height:1.6;
@@ -828,8 +866,16 @@
     flex:0 0 64px;
     font-size:11px;
     color:var(--on-surface-variant);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
   }
+  /* findings' compare bars carry longer labels (theme names, time-of-day
+     buckets) than the original 64px tag column was sized for */
+  .finding-compare{ margin-top:0.7rem; }
+  .finding-compare .compare-bar-row .tag{ flex-basis:76px; }
   .compare-bar-row .track{
+    display:block;
     flex:1;
     height:10px;
     background:var(--surface-container-high);
@@ -837,8 +883,11 @@
     overflow:hidden;
   }
   .compare-bar-row .fill{
+    display:block;
     height:100%;
     border-radius:9999px;
+    width:0%;
+    transition:width 0.8s cubic-bezier(0.22,1,0.36,1);
   }
   .compare-bar-row .val{
     flex:0 0 34px;
@@ -1010,7 +1059,7 @@
 
   <div class="app">
 
-    <section class="screen" id="screen-record">
+    <section class="screen" id="screen-record" hidden>
       <header>
         <h1>Daily Log</h1>
       </header>
@@ -1067,7 +1116,7 @@
       </div>
     </section>
 
-    <section class="screen" id="screen-mood" hidden>
+    <section class="screen" id="screen-mood">
       <header>
         <h1>気分</h1>
         <p class="subtitle">思い立った時に、今の気分を記録できます</p>
@@ -1146,7 +1195,8 @@
           <h2>コンディションの推移</h2>
         </div>
         <div class="granularity-toggle" id="trendWindowToggle">
-          <button type="button" data-window="7" class="active">7日</button>
+          <button type="button" data-window="3" class="active">3日</button>
+          <button type="button" data-window="7">7日</button>
           <button type="button" data-window="30">30日</button>
           <button type="button" data-window="90">90日</button>
         </div>
@@ -1181,17 +1231,17 @@
 
   <nav class="bottom-nav">
     <div class="bottom-nav-inner">
-      <button class="nav-item active" data-tab="record">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M9 12.5l2 2 4.5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/></svg>
-        記録
-      </button>
-      <button class="nav-item" data-tab="mood">
+      <button class="nav-item active" data-tab="mood">
         <svg viewBox="0 0 24 24" fill="none"><path d="M3 12h4l2 6 4-12 2 6h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         気分
       </button>
       <button class="nav-item" data-tab="analysis">
         <svg viewBox="0 0 24 24" fill="none"><path d="M4 20V10M12 20V4M20 20v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         分析
+      </button>
+      <button class="nav-item" data-tab="record">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M9 12.5l2 2 4.5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/></svg>
+        記録
       </button>
     </div>
   </nav>
@@ -1294,6 +1344,47 @@
       ` L ${areaPoints[areaPoints.length-1].x} ${baselineY}` +
       ` L ${areaPoints[0].x} ${baselineY} Z`;
     svg.appendChild(svgEl('path', { d, fill:`url(#${gradId})`, stroke:'none' }));
+  }
+
+  // Runs cb after two animation frames — the reliable way to make a CSS
+  // transition actually animate from a just-set starting value (e.g. a
+  // meter/bar fill set to width:0%) instead of jumping straight to the
+  // end state, which happens if the end value is applied in the same
+  // frame the element was inserted.
+  function raf2(cb){
+    requestAnimationFrame(() => requestAnimationFrame(cb));
+  }
+
+  // Counts a number up from 0 to `to`, eased out — a small graphical
+  // flourish so a headline stat registers as movement, not just static
+  // text, when the analysis tab is opened.
+  function animateNumber(el, to, decimals, duration){
+    duration = duration || 700;
+    const start = performance.now();
+    function tick(now){
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      el.textContent = (to * eased).toFixed(decimals);
+      if (t < 1) requestAnimationFrame(tick);
+      else el.textContent = to.toFixed(decimals);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // Adds a line's draw-in animation (stroke grows from nothing to full
+  // length) and pops each of its data dots in with a slight bounce —
+  // makes a re-rendered chart read as "here's what changed" instead of
+  // an instant, static swap.
+  function animateLineDraw(pathEl){
+    const len = pathEl.getTotalLength();
+    pathEl.style.strokeDasharray = `${len}`;
+    pathEl.style.strokeDashoffset = `${len}`;
+    pathEl.classList.add('chart-line-draw');
+    raf2(() => { pathEl.style.strokeDashoffset = '0'; });
+  }
+  function popInDot(dotEl, delayMs){
+    dotEl.classList.add('chart-dot-pop');
+    dotEl.style.animationDelay = `${delayMs}ms`;
   }
 
   // 5-point scale (0–4), matching anxiety's scale below — both use the
@@ -1832,15 +1923,17 @@
         'stroke-linecap':'round', 'stroke-linejoin':'round'
       });
       daySvg.appendChild(path);
+      animateLineDraw(path);
     }
 
-    points.forEach(p => {
+    points.forEach((p, i) => {
       const dot = svgEl('circle', {
         cx:p.x, cy:p.y, r:5,
         fill: MOOD_COLORS[p.entry.level],
         stroke:'var(--surface-container)', 'stroke-width':'2'
       });
       daySvg.appendChild(dot);
+      popInDot(dot, i * 45);
 
       const hit = svgEl('circle', { cx:p.x, cy:p.y, r:12, fill:'transparent' });
       hit.style.cursor = 'pointer';
@@ -1907,7 +2000,7 @@
   }
 
   /* ---- コンディションの推移: 7日/30日/90日の固定ウィンドウ（常に日次） ---- */
-  let trendWindowDays = 7;
+  let trendWindowDays = 3;
 
   function buildTrendPoints(windowDays){
     const cutoff = Date.now() - windowDays*DAY_MS;
@@ -1982,23 +2075,47 @@
 
     if (recentVals.length === 0){
       valueEl.textContent = 'データなし';
-    } else {
-      const avg = mean(recentVals);
-      valueEl.textContent = avg.toFixed(1);
-      if (priorVals.length > 0){
-        const diff = avg - mean(priorVals);
-        if (Math.abs(diff) < 0.3){
-          deltaEl.textContent = '前の7日間と同程度';
-        } else {
-          const favorable = moodLike ? diff > 0 : diff < 0;
-          deltaEl.textContent = `前の7日間より ${diff > 0 ? '+' : ''}${diff.toFixed(1)}`;
-          deltaEl.classList.add(favorable ? 'favorable' : 'unfavorable');
-        }
+      wrap.appendChild(labelEl);
+      wrap.appendChild(valueEl);
+      wrap.appendChild(deltaEl);
+      return wrap;
+    }
+
+    const avg = mean(recentVals);
+    const scaleMax = moodLike ? MOOD_MAX : ANXIETY_MAX;
+    const colors = moodLike ? MOOD_COLORS : ANXIETY_COLORS;
+    const roundedLevel = Math.max(0, Math.min(scaleMax, Math.round(avg)));
+
+    valueEl.textContent = '0.0';
+    animateNumber(valueEl, avg, 1);
+
+    if (priorVals.length > 0){
+      const diff = avg - mean(priorVals);
+      if (Math.abs(diff) < 0.3){
+        deltaEl.textContent = '前の7日間と同程度';
+      } else {
+        const favorable = moodLike ? diff > 0 : diff < 0;
+        deltaEl.textContent = `前の7日間より ${diff > 0 ? '+' : ''}${diff.toFixed(1)}`;
+        deltaEl.classList.add(favorable ? 'favorable' : 'unfavorable');
       }
     }
+
+    // Meter: fill = the value's position on the 0〜{scaleMax} scale,
+    // colored by the same ordinal ramp used everywhere else for that
+    // metric — so "3.0" isn't just a number, it visibly sits near one
+    // end of the bar or the other.
+    const meter = document.createElement('div');
+    meter.className = 'meter';
+    const fill = document.createElement('div');
+    fill.className = 'fill';
+    fill.style.background = colors[roundedLevel];
+    meter.appendChild(fill);
+
     wrap.appendChild(labelEl);
     wrap.appendChild(valueEl);
+    wrap.appendChild(meter);
     wrap.appendChild(deltaEl);
+    raf2(() => { fill.style.width = `${avg / scaleMax * 100}%`; });
     return wrap;
   }
 
@@ -2040,9 +2157,14 @@
   function computeFindings(){
     const now = Date.now();
     const candidates = [];
-    const push = (text, detail, magnitude, scale, n) => {
+    // `compare` (optional): { aLabel, aValue, bLabel, bValue, max, colors }
+    // — lets renderFindings draw a little two-bar visual under the text,
+    // colored by the same ordinal ramp as everywhere else. Omitted for
+    // findings that aren't a same-scale before/after comparison (e.g.
+    // variability), which stay text-only.
+    const push = (text, detail, magnitude, scale, n, compare) => {
       if (n < MIN_SAMPLE) return;
-      candidates.push({ text, detail, n, score: Math.abs(magnitude) / scale });
+      candidates.push({ text, detail, n, score: Math.abs(magnitude) / scale, compare });
     };
 
     // 時間帯別の不安
@@ -2057,7 +2179,8 @@
         if (Math.abs(diff) >= 0.3){
           push(`${bucket}に不安が${diff > 0 ? '高め' : '低め'}です`,
             `${bucket}の平均不安 ${mean(vals).toFixed(1)} ／ その他の時間帯 ${mean(others).toFixed(1)}`,
-            diff, ANXIETY_MAX, Math.min(vals.length, others.length));
+            diff, ANXIETY_MAX, Math.min(vals.length, others.length),
+            { aLabel: bucket, aValue: mean(vals), bLabel: 'その他', bValue: mean(others), max: ANXIETY_MAX, colors: ANXIETY_COLORS });
         }
       });
     }
@@ -2077,7 +2200,8 @@
             if (diff >= 0.3){
               push(`「${theme}」に関するメモがある時に不安が高めです`,
                 `平均不安 ${mean(themeAnxiety).toFixed(1)} ／ 全体平均 ${mean(overallAnxiety).toFixed(1)}`,
-                diff, ANXIETY_MAX, themeAnxiety.length);
+                diff, ANXIETY_MAX, themeAnxiety.length,
+                { aLabel: theme, aValue: mean(themeAnxiety), bLabel: '全体', bValue: mean(overallAnxiety), max: ANXIETY_MAX, colors: ANXIETY_COLORS });
             }
           }
           const themeMood = themeEntries.map(e => e.level);
@@ -2086,7 +2210,8 @@
             if (diff >= 0.3){
               push(`「${theme}」に関するメモがある時に気分が低めです`,
                 `平均気分 ${mean(themeMood).toFixed(1)} ／ 全体平均 ${mean(overallMood).toFixed(1)}`,
-                diff, MOOD_MAX, themeMood.length);
+                diff, MOOD_MAX, themeMood.length,
+                { aLabel: theme, aValue: mean(themeMood), bLabel: '全体', bValue: mean(overallMood), max: MOOD_MAX, colors: MOOD_COLORS });
             }
           }
         });
@@ -2111,6 +2236,43 @@
     return candidates;
   }
 
+  // A small two-bar visual for a finding's "A vs B" comparison, reusing
+  // the same track/fill component as elsewhere — colored by the value's
+  // position on its ordinal ramp, width animated in on render, so the
+  // headline sentence has something to point at rather than resting on
+  // two bare numbers.
+  function buildFindingCompareBars(compare){
+    const wrap = document.createElement('div');
+    wrap.className = 'compare-bars finding-compare';
+    [
+      { label: compare.aLabel, value: compare.aValue },
+      { label: compare.bLabel, value: compare.bValue },
+    ].forEach(row => {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'compare-bar-row';
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = row.label;
+      tag.title = row.label;
+      const track = document.createElement('span');
+      track.className = 'track';
+      const fill = document.createElement('span');
+      fill.className = 'fill';
+      const roundedLevel = Math.max(0, Math.min(compare.max, Math.round(row.value)));
+      fill.style.background = compare.colors[roundedLevel];
+      track.appendChild(fill);
+      const val = document.createElement('span');
+      val.className = 'val';
+      val.textContent = row.value.toFixed(1);
+      rowEl.appendChild(tag);
+      rowEl.appendChild(track);
+      rowEl.appendChild(val);
+      wrap.appendChild(rowEl);
+      raf2(() => { fill.style.width = `${row.value / compare.max * 100}%`; });
+    });
+    return wrap;
+  }
+
   function renderFindings(){
     const top = computeFindings().sort((a,b) => b.score - a.score).slice(0, 3);
     findingsListEl.innerHTML = '';
@@ -2120,7 +2282,8 @@
     }
     top.forEach((f, i) => {
       const item = document.createElement('div');
-      item.className = 'finding-item';
+      item.className = 'finding-item anim-fade-up';
+      item.style.animationDelay = `${i * 70}ms`;
       const rank = document.createElement('div');
       rank.className = 'rank';
       rank.textContent = String(i+1);
@@ -2134,6 +2297,9 @@
         detail.className = 'detail';
         detail.textContent = f.detail;
         body.appendChild(detail);
+      }
+      if (f.compare){
+        body.appendChild(buildFindingCompareBars(f.compare));
       }
       item.appendChild(rank);
       item.appendChild(body);
@@ -2254,19 +2420,23 @@
     const points = trendPoints.map((p,i) => ({ x:xFor(i), y:yFor(p.avg), point:p }));
     if (points.length >= 2){
       appendAreaGradientFill(analysisSvg, points, baseline, 'trendAreaGrad');
-      analysisSvg.appendChild(svgEl('path', {
+      const linePath = svgEl('path', {
         d: smoothPathD(points),
         fill:'none', stroke:'var(--on-surface-variant)', 'stroke-width':'2',
         'stroke-linecap':'round', 'stroke-linejoin':'round'
-      }));
+      });
+      analysisSvg.appendChild(linePath);
+      animateLineDraw(linePath);
     }
-    points.forEach(p => {
+    points.forEach((p, i) => {
       const roundedLevel = Math.max(MOOD_MIN, Math.min(MOOD_MAX, Math.round(p.point.avg)));
-      analysisSvg.appendChild(svgEl('circle', {
+      const dot = svgEl('circle', {
         cx:p.x, cy:p.y, r:4.5,
         fill: MOOD_COLORS[roundedLevel],
         stroke:'var(--surface-container)', 'stroke-width':'2'
-      }));
+      });
+      analysisSvg.appendChild(dot);
+      popInDot(dot, i * 45);
       const hit = svgEl('circle', { cx:p.x, cy:p.y, r:12, fill:'transparent' });
       hit.style.cursor = 'pointer';
       hit.addEventListener('click', () => showTrendTooltip(p.point));
@@ -2325,11 +2495,13 @@
     const flushRun = () => {
       if (run.length >= 2){
         appendAreaGradientFill(anxietyTrendSvg, run, baseline, `anxietyAreaGrad${gradN++}`);
-        anxietyTrendSvg.appendChild(svgEl('path', {
+        const linePath = svgEl('path', {
           d: smoothPathD(run),
           fill:'none', stroke:'var(--on-surface-variant)', 'stroke-width':'2',
           'stroke-linecap':'round', 'stroke-linejoin':'round'
-        }));
+        });
+        anxietyTrendSvg.appendChild(linePath);
+        animateLineDraw(linePath);
       }
       run = [];
     };
@@ -2339,14 +2511,16 @@
     });
     flushRun();
 
-    points.forEach(p => {
+    points.forEach((p, i) => {
       if (p.y == null) return;
       const roundedLevel = Math.max(ANXIETY_MIN, Math.min(ANXIETY_MAX, Math.round(p.point.avg)));
-      anxietyTrendSvg.appendChild(svgEl('circle', {
+      const dot = svgEl('circle', {
         cx:p.x, cy:p.y, r:4.5,
         fill: ANXIETY_COLORS[roundedLevel],
         stroke:'var(--surface-container)', 'stroke-width':'2'
-      }));
+      });
+      anxietyTrendSvg.appendChild(dot);
+      popInDot(dot, i * 45);
       const hit = svgEl('circle', { cx:p.x, cy:p.y, r:12, fill:'transparent' });
       hit.style.cursor = 'pointer';
       hit.addEventListener('click', () => showAnxietyTrendTooltip(p.point));
@@ -2696,13 +2870,33 @@
     }
     const total = taggedSubset.length;
     const sorted = Array.from(countThemes(taggedSubset).entries()).sort((a,b)=>b[1]-a[1]);
+    // A share-of-total bar per theme. Themes have no inherent order, so
+    // this stays one flat hue (never a value-ramp on nominal categories)
+    // — the bar's length carries the number, not its color.
     const wrap = document.createElement('div');
-    wrap.className = 'freq-rows';
+    wrap.className = 'compare-bars';
     sorted.forEach(([theme, count]) => {
+      const pct = Math.round(count/total*100);
       const row = document.createElement('div');
-      row.className = 'freq-row';
-      row.innerHTML = `<span class="tag">${theme}</span><span class="vals">${Math.round(count/total*100)}%</span>`;
+      row.className = 'compare-bar-row';
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = theme;
+      tag.title = theme;
+      const track = document.createElement('span');
+      track.className = 'track';
+      const fill = document.createElement('span');
+      fill.className = 'fill';
+      fill.style.background = 'var(--accent-a)';
+      track.appendChild(fill);
+      const val = document.createElement('span');
+      val.className = 'val';
+      val.textContent = `${pct}%`;
+      row.appendChild(tag);
+      row.appendChild(track);
+      row.appendChild(val);
       wrap.appendChild(row);
+      raf2(() => { fill.style.width = `${pct}%`; });
     });
     body.appendChild(wrap);
   }
@@ -2831,8 +3025,9 @@
   });
 
   /* ---------------- init ---------------- */
+  // 気分タブが最初に開くタブなので、記録タブ側の分析（自慰行為との関連）は
+  // 分析タブと同じく遅延描画 — showTab() で record に切り替えた時だけ描く。
   renderRecord();
-  renderRecordAnalysis();
   renderMoodHistory();
   renderMoodDay();
   checkForUpdate();
