@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Daily Log" />
 <meta name="theme-color" content="#0f766e" />
-<meta name="app-build" content="20260912-1720" />
+<meta name="app-build" content="20260913-1200" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,16 +36,16 @@
     --accent-a: #0f766e;
     --accent-b: #0e7490;
     --error: #e11d48;
-    /* Mood ordinal ramp (7 steps, 0–6) — one hue, monotone lightness,
-       validated against the white card surface with
-       scripts/validate_palette.js --ordinal (light→dark order below). */
+    /* Mood ordinal ramp (5 steps, 0–4, matching anxiety's 5-point scale)
+       — one hue, monotone lightness, validated against the white card
+       surface with scripts/validate_palette.js --ordinal (light→dark
+       order below). Reuses a subset of the original 7-step ramp's
+       already-validated colors rather than inventing new ones. */
     --mood-0: #7fbfb2;
-    --mood-1: #5cae9f;
-    --mood-2: #3d9c8c;
-    --mood-3: #237f70;
-    --mood-4: #0f6355;
-    --mood-5: #073f37;
-    --mood-6: #03241e;
+    --mood-1: #3d9c8c;
+    --mood-2: #237f70;
+    --mood-3: #0f6355;
+    --mood-4: #03241e;
     /* Anxiety ordinal ramp (5 steps, 0–4) — a separate hue (amber) from
        mood's teal, since the two are different measurements (dataviz:
        each series gets one hue; reusing mood's teal for a different
@@ -218,7 +218,9 @@
     margin-top:2px;
   }
   .list-item .left{ display:flex; align-items:center; gap:0.6rem; }
-  .list-item button.delete{
+  .list-item .actions{ display:flex; align-items:center; gap:0.1rem; flex:0 0 auto; }
+  .list-item button.delete,
+  .list-item button.edit{
     appearance:none;
     background:transparent;
     border:none;
@@ -229,6 +231,10 @@
     display:flex;
     align-items:center;
     justify-content:center;
+  }
+  .list-item button.edit:hover{
+    color:var(--primary);
+    background:rgba(15,118,110,0.08);
   }
   .list-item button.delete:hover{
     color:var(--error);
@@ -319,6 +325,52 @@
     transition:opacity 0.2s ease;
   }
   .mood-toast.show{ opacity:1; }
+
+  /* banner shown while editing an existing history entry from the
+     mood picker above — makes it unmistakable that a tap on a chip
+     will now update that past record instead of logging a new one */
+  .editing-banner{
+    display:flex;
+    align-items:center;
+    gap:0.5rem;
+    background:var(--surface-container-high);
+    border-radius:1.25rem;
+    padding:0.55rem 0.5rem 0.55rem 0.9rem;
+    margin:0 0 1rem;
+  }
+  .editing-banner[hidden]{ display:none; }
+  .editing-banner .label{
+    flex:0 1 auto;
+    min-width:0;
+    font-size:12px;
+    font-weight:600;
+    color:var(--on-surface);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .editing-banner input[type="datetime-local"]{
+    flex:1 1 auto;
+    min-width:0;
+    border:none;
+    border-radius:0.75rem;
+    background:var(--surface-container);
+    color:var(--on-surface);
+    font-family:inherit;
+    font-size:13px;
+    padding:0.35rem 0.5rem;
+  }
+  .editing-banner-close{
+    appearance:none;
+    border:none;
+    background:transparent;
+    color:var(--on-surface-variant);
+    font-size:18px;
+    line-height:1;
+    cursor:pointer;
+    padding:0.25rem 0.5rem;
+    flex:0 0 auto;
+  }
 
   .mood-detail-panel{
     background:var(--glass);
@@ -981,6 +1033,38 @@
         <span class="count" id="historyCount"></span>
       </div>
       <ul class="list" id="historyList"></ul>
+
+      <!-- 自慰行為との分析 — 気分/分析タブとは完全に分離。診察時に「気分」
+           「分析」タブだけ見せられるよう、このタブにしか出てこない。 -->
+      <div class="section-header" style="margin-top:2rem;"><h2>自慰行為との関連</h2></div>
+      <div class="insight-card tight" id="recSummaryBody"></div>
+      <button class="detail-toggle" id="recDetailToggle" type="button">詳しく見る</button>
+      <div class="detail-area" id="recDetailArea" hidden>
+        <details class="rec-section" id="recFreqSection">
+          <summary>自慰行為の頻度<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="rec-section-body" id="recFreqBody"></div>
+        </details>
+        <details class="rec-section" id="recDaySection">
+          <summary>自慰行為があった日／なかった日<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="rec-section-body" id="recDayBody"></div>
+        </details>
+        <details class="rec-section" id="recNextDaySection">
+          <summary>自慰行為をした翌日の状態<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="rec-section-body" id="recNextDayBody"></div>
+        </details>
+        <details class="rec-section" id="recFrequencyBucketSection">
+          <summary>自慰行為の頻度と気分・不安<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="rec-section-body" id="recFrequencyBucketBody"></div>
+        </details>
+        <details class="rec-section" id="recTodSection">
+          <summary>自慰行為の時間帯<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="rec-section-body" id="recTodBody"></div>
+        </details>
+        <details class="rec-section" id="recMemoSection">
+          <summary>自慰行為前後のメモの傾向<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
+          <div class="rec-section-body" id="recMemoBody"></div>
+        </details>
+      </div>
     </section>
 
     <section class="screen" id="screen-mood" hidden>
@@ -989,8 +1073,13 @@
         <p class="subtitle">思い立った時に、今の気分を記録できます</p>
       </header>
 
-      <p class="mood-prompt">今の気分は？</p>
-      <div class="mood-picker">
+      <div class="editing-banner" id="editingBanner" hidden>
+        <span class="label" id="editingBannerLabel"></span>
+        <input type="datetime-local" id="editingDatetimeInput" />
+        <button class="editing-banner-close" id="editingBannerClose" aria-label="編集を終了">×</button>
+      </div>
+      <p class="mood-prompt" id="moodPrompt">今の気分は？</p>
+      <div class="mood-picker" id="moodPicker">
         <div class="choice-list" id="moodList"></div>
       </div>
       <div class="mood-toast" id="moodToast"></div>
@@ -1062,7 +1151,7 @@
           <button type="button" data-window="90">90日</button>
         </div>
         <div class="sub-chart">
-          <div class="sub-chart-title">気分（0〜6）</div>
+          <div class="sub-chart-title">気分（0〜4）</div>
           <div class="chart-tooltip placeholder" id="analysisTooltip">点をタップすると詳細を表示します</div>
           <svg class="chart-svg" id="analysisSvg" viewBox="0 0 320 130" preserveAspectRatio="none"></svg>
         </div>
@@ -1077,34 +1166,7 @@
       <div class="section-header"><h2>最近の傾向</h2></div>
       <div class="findings-list" id="findingsList"></div>
 
-      <!-- 4. 自慰行為との関連 — 1セクションに集約、詳細は折りたたみ -->
-      <div class="section-header"><h2>自慰行為との関連</h2></div>
-      <div class="insight-card tight" id="recSummaryBody"></div>
-      <button class="detail-toggle" id="recDetailToggle" type="button">詳しく見る</button>
-      <div class="detail-area" id="recDetailArea" hidden>
-        <details class="rec-section" id="recFreqSection">
-          <summary>自慰行為の頻度<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-          <div class="rec-section-body" id="recFreqBody"></div>
-        </details>
-        <details class="rec-section" id="recDaySection">
-          <summary>自慰行為があった日／なかった日<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-          <div class="rec-section-body" id="recDayBody"></div>
-        </details>
-        <details class="rec-section" id="recNextDaySection">
-          <summary>自慰行為をした翌日の状態<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-          <div class="rec-section-body" id="recNextDayBody"></div>
-        </details>
-        <details class="rec-section" id="recFrequencyBucketSection">
-          <summary>自慰行為の頻度と気分・不安<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-          <div class="rec-section-body" id="recFrequencyBucketBody"></div>
-        </details>
-        <details class="rec-section" id="recTodSection">
-          <summary>自慰行為の時間帯<svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></summary>
-          <div class="rec-section-body" id="recTodBody"></div>
-        </details>
-      </div>
-
-      <!-- 5. メモから見えること -->
+      <!-- 4. メモから見えること -->
       <div class="section-header"><h2>メモから見えること</h2></div>
       <div class="insight-card tight" id="memoSummaryBody"></div>
       <button class="detail-toggle" id="memoDetailToggle" type="button">詳しく見る</button>
@@ -1234,16 +1296,20 @@
     svg.appendChild(svgEl('path', { d, fill:`url(#${gradId})`, stroke:'none' }));
   }
 
-  const MOOD_MIN = 0, MOOD_MAX = 6, MOOD_MID = 3;
+  // 5-point scale (0–4), matching anxiety's scale below — both use the
+  // same number of grades so the two axes read as comparably-grained.
+  const MOOD_MIN = 0, MOOD_MAX = 4, MOOD_MID = 2;
   const MOOD_COLORS = {
-    0:'var(--mood-0)', 1:'var(--mood-1)', 2:'var(--mood-2)', 3:'var(--mood-3)',
-    4:'var(--mood-4)', 5:'var(--mood-5)', 6:'var(--mood-6)'
+    0:'var(--mood-0)', 1:'var(--mood-1)', 2:'var(--mood-2)', 3:'var(--mood-3)', 4:'var(--mood-4)'
   };
-  const MOOD_TEXT_COLORS = { 0:'var(--on-surface)', 1:'var(--on-surface)', 2:'var(--on-surface)', 3:'#ffffff', 4:'#ffffff', 5:'#ffffff', 6:'#ffffff' };
+  const MOOD_TEXT_COLORS = { 0:'var(--on-surface)', 1:'var(--on-surface)', 2:'#ffffff', 3:'#ffffff', 4:'#ffffff' };
   const MOOD_LABELS = {
-    0:'かなり悪い', 1:'悪い', 2:'やや悪い', 3:'普通',
-    4:'やや良い', 5:'良い', 6:'とても良い'
+    0:'とても悪い', 1:'悪い', 2:'普通', 3:'良い', 4:'とても良い'
   };
+  // Small facial-expression emoji shown alongside the text label in the
+  // mood history list, so a row is readable at a glance without reading
+  // the words first.
+  const MOOD_EMOJI = { 0:'😞', 1:'🙁', 2:'😐', 3:'🙂', 4:'😄' };
 
   const ANXIETY_MIN = 0, ANXIETY_MAX = 4, ANXIETY_MID = 2;
   const ANXIETY_COLORS = { 0:'var(--anxiety-0)', 1:'var(--anxiety-1)', 2:'var(--anxiety-2)', 3:'var(--anxiety-3)', 4:'var(--anxiety-4)' };
@@ -1251,6 +1317,7 @@
   const ANXIETY_LABELS = {
     0:'不安なし', 1:'少し不安', 2:'やや不安', 3:'強い不安', 4:'非常に強い不安'
   };
+  const ANXIETY_EMOJI = { 0:'😌', 1:'🙂', 2:'😟', 3:'😰', 4:'😱' };
   // Shorter labels for the picker only (the "不安" section heading already
   // says what's being rated, so repeating it on every chip is redundant) —
   // history/tooltips keep the full ANXIETY_LABELS above.
@@ -1297,9 +1364,10 @@
     navItems.forEach(btn => {
       btn.classList.toggle('active', btn.dataset.tab === tab);
     });
-    if (tab !== 'mood') closeDetailPanel();
+    if (tab !== 'mood') stopEditingMoodEntry();
     if (tab === 'mood') renderMoodDay();
     if (tab === 'analysis') renderAnalysis();
+    if (tab === 'record') renderRecordAnalysis();
   }
   navItems.forEach(btn => {
     btn.addEventListener('click', () => showTab(btn.dataset.tab));
@@ -1394,6 +1462,7 @@
           records = records.filter(r => r !== ts);
           saveArray(RECORDS_KEY, records);
           renderRecord();
+          renderRecordAnalysis();
         }
       });
 
@@ -1412,6 +1481,7 @@
     records.unshift(Date.now());
     saveArray(RECORDS_KEY, records);
     renderRecord();
+    renderRecordAnalysis();
   });
 
   setInterval(renderRecordStatus, 30000);
@@ -1421,9 +1491,29 @@
   // entries: [{ts, level}], newest first
   let moods = loadArray(MOODS_KEY).sort((a,b) => b.ts - a.ts);
 
+  // One-time migration: mood used to be a 7-point scale (0–6); it's now
+  // 5-point (0–4) to match anxiety. Compress any old values down (rounds
+  // to the nearest new grade) so existing history keeps its ordering
+  // instead of breaking on colors/labels that no longer go past 4.
+  (function migrateMoodScale(){
+    const FLAG = 'daily-private-memo.moodScaleMigratedV2';
+    if (localStorage.getItem(FLAG)) return;
+    let changed = false;
+    moods.forEach(m => {
+      if (typeof m.level === 'number' && m.level > MOOD_MAX){
+        m.level = Math.max(MOOD_MIN, Math.min(MOOD_MAX, Math.round(m.level * MOOD_MAX / 6)));
+        changed = true;
+      }
+    });
+    if (changed) saveArray(MOODS_KEY, moods);
+    try{ localStorage.setItem(FLAG, '1'); }catch(e){ /* ignore */ }
+  })();
+
   const moodToastEl = document.getElementById('moodToast');
   const moodHistoryListEl = document.getElementById('moodHistoryList');
   const moodHistoryCountEl = document.getElementById('moodHistoryCount');
+  const moodPromptEl = document.getElementById('moodPrompt');
+  const moodPickerEl = document.getElementById('moodPicker');
   const moodListEl = document.getElementById('moodList');
   const anxietyListEl = document.getElementById('anxietyList');
   const moodDetailPanelEl = document.getElementById('moodDetailPanel');
@@ -1431,6 +1521,10 @@
   const detailCloseBtn = document.getElementById('detailCloseBtn');
   const noteInputEl = document.getElementById('noteInput');
   const noteSavedHintEl = document.getElementById('noteSavedHint');
+  const editingBannerEl = document.getElementById('editingBanner');
+  const editingBannerLabelEl = document.getElementById('editingBannerLabel');
+  const editingDatetimeInputEl = document.getElementById('editingDatetimeInput');
+  const editingBannerCloseEl = document.getElementById('editingBannerClose');
 
   let toastTimer = null;
   function showToast(text){
@@ -1445,6 +1539,13 @@
   // anxiety/note are purely optional add-ons to an already-saved record.
   let activeDetailEntry = null;
 
+  // Set while editing a past entry from the history list below (tapped
+  // its pencil icon). While set, tapping a chip in the main mood picker
+  // updates this entry instead of logging a brand-new one — lets
+  // mistakes (wrong level, wrong anxiety, wrong note, wrong time) be
+  // corrected instead of only deleted and re-entered.
+  let editingEntry = null;
+
   function closeDetailPanel(){
     activeDetailEntry = null;
     moodDetailPanelEl.hidden = true;
@@ -1454,14 +1555,72 @@
 
   function openDetailPanelFor(entry, level){
     activeDetailEntry = entry;
-    detailSummaryEl.textContent = `気分 ${level}　${MOOD_LABELS[level]} を記録しました`;
-    anxietyListEl.querySelectorAll('.choice-row').forEach(row => row.classList.remove('selected'));
-    noteInputEl.value = '';
+    detailSummaryEl.textContent = editingEntry
+      ? `編集中：気分 ${level}　${MOOD_LABELS[level]}`
+      : `気分 ${level}　${MOOD_LABELS[level]} を記録しました`;
+    anxietyListEl.querySelectorAll('.choice-row').forEach(row => {
+      row.classList.toggle('selected', hasAnxiety(entry) && Number(row.dataset.level) === entry.anxiety);
+    });
+    noteInputEl.value = entry.note || '';
     noteSavedHintEl.classList.remove('show');
     moodDetailPanelEl.hidden = false;
   }
 
-  buildChoiceList(moodListEl, MOOD_MIN, MOOD_MAX, MOOD_COLORS, MOOD_TEXT_COLORS, MOOD_LABELS, (level) => {
+  function toDatetimeLocalValue(ts){
+    const d = new Date(ts);
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    const hh = String(d.getHours()).padStart(2,'0');
+    const mm = String(d.getMinutes()).padStart(2,'0');
+    return `${y}-${m}-${day}T${hh}:${mm}`;
+  }
+
+  function stopEditingMoodEntry(){
+    editingEntry = null;
+    editingBannerEl.hidden = true;
+    moodPromptEl.textContent = '今の気分は？';
+    moodListEl.querySelectorAll('.choice-row').forEach(row => row.classList.remove('selected'));
+    closeDetailPanel();
+  }
+
+  function startEditingMoodEntry(entry){
+    editingEntry = entry;
+    editingBannerLabelEl.textContent = `${formatDateTime(entry.ts)} を編集中`;
+    editingDatetimeInputEl.value = toDatetimeLocalValue(entry.ts);
+    editingBannerEl.hidden = false;
+    moodPromptEl.textContent = 'この記録の気分を選び直せます';
+    moodListEl.querySelectorAll('.choice-row').forEach(row => {
+      row.classList.toggle('selected', Number(row.dataset.level) === entry.level);
+    });
+    openDetailPanelFor(entry, entry.level);
+    moodPickerEl.scrollIntoView({ behavior:'smooth', block:'start' });
+  }
+
+  editingDatetimeInputEl.addEventListener('change', () => {
+    if (!editingEntry) return;
+    const newTs = new Date(editingDatetimeInputEl.value).getTime();
+    if (Number.isNaN(newTs)) return;
+    editingEntry.ts = newTs;
+    moods.sort((a,b) => b.ts - a.ts);
+    saveArray(MOODS_KEY, moods);
+    editingBannerLabelEl.textContent = `${formatDateTime(newTs)} を編集中`;
+    renderMoodHistory();
+    renderMoodDay();
+  });
+  editingBannerCloseEl.addEventListener('click', stopEditingMoodEntry);
+
+  buildChoiceList(moodListEl, MOOD_MIN, MOOD_MAX, MOOD_COLORS, MOOD_TEXT_COLORS, MOOD_LABELS, (level, btn) => {
+    if (editingEntry){
+      editingEntry.level = level;
+      saveArray(MOODS_KEY, moods);
+      moodListEl.querySelectorAll('.choice-row').forEach(row => row.classList.toggle('selected', row === btn));
+      showToast(`更新しました（${MOOD_LABELS[level]}）`);
+      renderMoodHistory();
+      renderMoodDay();
+      openDetailPanelFor(editingEntry, level);
+      return;
+    }
     const entry = { ts: Date.now(), level, anxiety: null, note: '' };
     moods.unshift(entry);
     saveArray(MOODS_KEY, moods);
@@ -1479,7 +1638,10 @@
     renderMoodHistory();
   });
 
-  detailCloseBtn.addEventListener('click', closeDetailPanel);
+  detailCloseBtn.addEventListener('click', () => {
+    if (editingEntry) stopEditingMoodEntry();
+    else closeDetailPanel();
+  });
 
   let noteSaveTimer = null;
   function saveNote(){
@@ -1528,13 +1690,13 @@
       time.textContent = formatDateTime(entry.ts);
       const moodLine = document.createElement('div');
       moodLine.className = 'sub-line';
-      moodLine.textContent = `気分 ${entry.level}　${MOOD_LABELS[entry.level]}`;
+      moodLine.textContent = `${MOOD_EMOJI[entry.level]} 気分 ${entry.level}　${MOOD_LABELS[entry.level]}`;
       textCol.appendChild(time);
       textCol.appendChild(moodLine);
       if (hasAnxiety(entry)){
         const anxietyLine = document.createElement('div');
         anxietyLine.className = 'sub-line';
-        anxietyLine.textContent = `不安 ${entry.anxiety}　${ANXIETY_LABELS[entry.anxiety]}`;
+        anxietyLine.textContent = `${ANXIETY_EMOJI[entry.anxiety]} 不安 ${entry.anxiety}　${ANXIETY_LABELS[entry.anxiety]}`;
         textCol.appendChild(anxietyLine);
       }
       if (entry.note){
@@ -1547,12 +1709,22 @@
       tag.appendChild(textCol);
       left.appendChild(tag);
 
+      const actions = document.createElement('div');
+      actions.className = 'actions';
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'edit';
+      editBtn.setAttribute('aria-label', '編集');
+      editBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 20h4L20 8l-4-4L4 16v4z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M13.5 6.5l4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      editBtn.addEventListener('click', () => startEditingMoodEntry(entry));
+
       const delBtn = document.createElement('button');
       delBtn.className = 'delete';
       delBtn.setAttribute('aria-label', '削除');
       delBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2m-7 0v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       delBtn.addEventListener('click', () => {
         if (confirm('この記録を削除しますか？')){
+          if (editingEntry === entry) stopEditingMoodEntry();
           moods = moods.filter(m => m !== entry);
           saveArray(MOODS_KEY, moods);
           renderMoodHistory();
@@ -1561,8 +1733,10 @@
         }
       });
 
+      actions.appendChild(editBtn);
+      actions.appendChild(delBtn);
       li.appendChild(left);
-      li.appendChild(delBtn);
+      li.appendChild(actions);
       moodHistoryListEl.appendChild(li);
     });
   }
@@ -1631,9 +1805,9 @@
       label.textContent = `${h}時`;
       daySvg.appendChild(label);
     });
-    // midline reference at level 3
+    // midline reference at the mood scale's midpoint
     daySvg.appendChild(svgEl('line', {
-      x1:DAY_PAD_X, x2:DAY_W-DAY_PAD_X, y1:yForLevel(3), y2:yForLevel(3),
+      x1:DAY_PAD_X, x2:DAY_W-DAY_PAD_X, y1:yForLevel(MOOD_MID), y2:yForLevel(MOOD_MID),
       stroke:'var(--outline)', 'stroke-width':'1', 'stroke-dasharray':'2 3'
     }));
 
@@ -1919,92 +2093,6 @@
       }
     }
 
-    // 自慰行為の前後（気分・不安）
-    {
-      const { before, after } = collectAroundWindows(3);
-      if (before.mood.length >= MIN_SAMPLE && after.mood.length >= MIN_SAMPLE){
-        const diff = mean(after.mood) - mean(before.mood);
-        if (Math.abs(diff) >= 0.3){
-          push(diff > 0 ? '自慰行為の後は気分が良い傾向があります' : '自慰行為の前は気分が良い傾向があります',
-            `前3時間 ${mean(before.mood).toFixed(1)} → 後3時間 ${mean(after.mood).toFixed(1)}`,
-            diff, MOOD_MAX, Math.min(before.mood.length, after.mood.length));
-        }
-      }
-      if (before.anxiety.length >= MIN_SAMPLE && after.anxiety.length >= MIN_SAMPLE){
-        const diff = mean(after.anxiety) - mean(before.anxiety);
-        if (Math.abs(diff) >= 0.3){
-          push(diff < 0 ? '自慰行為の後は不安が低い傾向があります' : '自慰行為の前は不安が高い傾向があります',
-            `前3時間 ${mean(before.anxiety).toFixed(1)} → 後3時間 ${mean(after.anxiety).toFixed(1)}`,
-            diff, ANXIETY_MAX, Math.min(before.anxiety.length, after.anxiety.length));
-        }
-      }
-    }
-
-    // 自慰行為があった日／なかった日、翌日
-    {
-      const byDate = groupDaysByMoodAnxiety();
-      const recordDayKeys = new Set(records.map(ts => localDateStr(ts)));
-      const withDays = { mood:[], anxiety:[] }, withoutDays = { mood:[], anxiety:[] };
-      const nextDay = { mood:[], anxiety:[] }, otherDay = { mood:[], anxiety:[] };
-      byDate.forEach((v, key) => {
-        const dayAvgMood = mean(v.mood);
-        const dayAvgAnxiety = v.anxiety.length > 0 ? mean(v.anxiety) : null;
-        const withTarget = recordDayKeys.has(key) ? withDays : withoutDays;
-        withTarget.mood.push(dayAvgMood);
-        if (dayAvgAnxiety != null) withTarget.anxiety.push(dayAvgAnxiety);
-        const nextTarget = recordDayKeys.has(addDays(key, -1)) ? nextDay : otherDay;
-        nextTarget.mood.push(dayAvgMood);
-        if (dayAvgAnxiety != null) nextTarget.anxiety.push(dayAvgAnxiety);
-      });
-      if (withDays.anxiety.length >= MIN_SAMPLE && withoutDays.anxiety.length >= MIN_SAMPLE){
-        const diff = mean(withDays.anxiety) - mean(withoutDays.anxiety);
-        if (Math.abs(diff) >= 0.3){
-          push(diff > 0 ? '自慰行為があった日は不安が高めな傾向があります' : '自慰行為があった日は不安が低めな傾向があります',
-            `あった日 ${mean(withDays.anxiety).toFixed(1)} ／ なかった日 ${mean(withoutDays.anxiety).toFixed(1)}`,
-            diff, ANXIETY_MAX, Math.min(withDays.anxiety.length, withoutDays.anxiety.length));
-        }
-      }
-      if (nextDay.anxiety.length >= MIN_SAMPLE && otherDay.anxiety.length >= MIN_SAMPLE){
-        const diff = mean(nextDay.anxiety) - mean(otherDay.anxiety);
-        if (Math.abs(diff) >= 0.3){
-          push(diff > 0 ? '自慰行為をした翌日は不安が高めな傾向があります' : '自慰行為をした翌日は不安が低めな傾向があります',
-            `翌日 ${mean(nextDay.anxiety).toFixed(1)} ／ その他の日 ${mean(otherDay.anxiety).toFixed(1)}`,
-            diff, ANXIETY_MAX, Math.min(nextDay.anxiety.length, otherDay.anxiety.length));
-        }
-      }
-    }
-
-    // 自慰行為の時間帯の偏り
-    if (records.length >= MIN_SAMPLE){
-      const counts = REC_TOD_BUCKETS.map(b => records.filter(ts => b.test(new Date(ts).getHours())).length);
-      const total = counts.reduce((a,b) => a+b, 0);
-      const maxIdx = counts.indexOf(Math.max(...counts));
-      const share = total > 0 ? counts[maxIdx] / total : 0;
-      if (share >= 0.4){
-        push(`自慰行為は${REC_TOD_BUCKETS[maxIdx].key}に多く記録されています`,
-          `${REC_TOD_BUCKETS[maxIdx].label}：${counts[maxIdx]}回 ／ 全${total}回`,
-          share - 0.25, 1, total);
-      }
-    }
-
-    // 自慰行為の頻度（週あたり）と不安
-    {
-      const weekCounts = new Map();
-      records.forEach(ts => { const key = weekKeyMonday(ts); weekCounts.set(key, (weekCounts.get(key)||0)+1); });
-      const lowWeeks = new Set(Array.from(weekCounts.entries()).filter(([,c]) => c>=1 && c<=2).map(([k])=>k));
-      const highWeeks = new Set(Array.from(weekCounts.entries()).filter(([,c]) => c>=5).map(([k])=>k));
-      const lowAnxiety = moods.filter(m => hasAnxiety(m) && lowWeeks.has(weekKeyMonday(m.ts))).map(m=>m.anxiety);
-      const highAnxiety = moods.filter(m => hasAnxiety(m) && highWeeks.has(weekKeyMonday(m.ts))).map(m=>m.anxiety);
-      if (lowAnxiety.length >= MIN_SAMPLE && highAnxiety.length >= MIN_SAMPLE){
-        const diff = mean(highAnxiety) - mean(lowAnxiety);
-        if (Math.abs(diff) >= 0.3){
-          push(diff > 0 ? '自慰行為の頻度が多い週は不安がやや高い傾向があります' : '自慰行為の頻度が多い週は不安がやや低い傾向があります',
-            `週5回以上 ${mean(highAnxiety).toFixed(1)} ／ 週1〜2回 ${mean(lowAnxiety).toFixed(1)}`,
-            diff, ANXIETY_MAX, Math.min(lowAnxiety.length, highAnxiety.length));
-        }
-      }
-    }
-
     // 気分の変動（直近30日 vs その前30日）
     {
       const recentLevels = moods.filter(m => m.ts >= now - 30*DAY_MS).map(m => m.level);
@@ -2053,7 +2141,7 @@
     });
   }
 
-  /* ---- 4. 自慰行為との関連（1セクションに集約） ---- */
+  /* ---- 記録タブ: 自慰行為との関連（1セクションに集約） ---- */
   function renderRecSummary(){
     if (records.length === 0){
       recSummaryBodyEl.textContent = 'まだ自慰行為の記録がありません。';
@@ -2088,7 +2176,7 @@
     recSummaryBodyEl.innerHTML = html;
   }
 
-  /* ---- 5. メモから見えること（要約のみ、詳細は「詳しく見る」） ---- */
+  /* ---- 4. メモから見えること（要約のみ、詳細は「詳しく見る」） ---- */
   function renderMemoSummary(){
     const tagged = getMemoTaggedEntries();
     if (tagged.length < MIN_SAMPLE){
@@ -2096,7 +2184,7 @@
       return;
     }
     const anxious = tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 3);
-    const good = tagged.filter(t => t.entry.level >= 4);
+    const good = tagged.filter(t => t.entry.level >= 3);
     let html = '';
     if (anxious.length >= MIN_SAMPLE){
       const top = Array.from(countThemes(anxious).entries()).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([t])=>t);
@@ -2112,14 +2200,22 @@
     renderRecentCard();
     updateTrendChart();
     renderFindings();
+    renderMemoAnalysis();
+    renderMemoSummary();
+  }
+
+  // Everything below that touches `records` (自慰行為) renders only into
+  // the 記録 tab, never into 分析 — so a screen shown to someone else
+  // (e.g. a doctor) via 気分/分析 never surfaces it. See screen-record's
+  // "自慰行為との関連" block in the HTML.
+  function renderRecordAnalysis(){
     renderRecFrequency();
     renderRecDayCompare();
     renderRecNextDay();
     renderRecFrequencyBuckets();
     renderRecTimeOfDay();
     renderRecSummary();
-    renderMemoAnalysis();
-    renderMemoSummary();
+    renderRecMemoAnalysis();
   }
 
   const TREND_W = 320, TREND_H = 130, TREND_PAD_X = 14, TREND_PAD_Y = 14;
@@ -2667,14 +2763,23 @@
     body.appendChild(statWrap);
 
     appendTopThemesBlock(body, '不安が強い時に多いテーマ（不安3〜4）', tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 3));
-    appendTopThemesBlock(body, '気分が低い時に多いテーマ（気分0〜2）', tagged.filter(t => t.entry.level <= 2));
-    appendTopThemesBlock(body, '気分が良い時に多いテーマ（気分4〜6）', tagged.filter(t => t.entry.level >= 4));
+    appendTopThemesBlock(body, '気分が低い時に多いテーマ（気分0〜1）', tagged.filter(t => t.entry.level <= 1));
+    appendTopThemesBlock(body, '気分が良い時に多いテーマ（気分3〜4）', tagged.filter(t => t.entry.level >= 3));
+  }
 
-    if (records.length >= MIN_SAMPLE){
-      const { before, after } = collectAroundMemoWindows(3);
-      appendThemeShareBlock(body, '自慰行為前3時間に多いテーマ', before);
-      appendThemeShareBlock(body, '自慰行為後3時間に多いテーマ', after);
+  // Moved out of renderMemoAnalysis() (分析タブ) into the 記録タブ側の
+  // 自慰行為との関連セクション — same reasoning as renderRecordAnalysis()
+  // above: nothing that names 自慰行為 renders into 分析.
+  function renderRecMemoAnalysis(){
+    const body = document.getElementById('recMemoBody');
+    body.innerHTML = '';
+    if (records.length < MIN_SAMPLE){
+      body.innerHTML = '<p class="note">まだ十分なデータがありません。</p>';
+      return;
     }
+    const { before, after } = collectAroundMemoWindows(3);
+    appendThemeShareBlock(body, '自慰行為前3時間に多いテーマ', before);
+    appendThemeShareBlock(body, '自慰行為後3時間に多いテーマ', after);
   }
 
   /* ---------------- reset (this device only — data lives in localStorage) ---------------- */
@@ -2727,6 +2832,7 @@
 
   /* ---------------- init ---------------- */
   renderRecord();
+  renderRecordAnalysis();
   renderMoodHistory();
   renderMoodDay();
   checkForUpdate();
