@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Daily Log" />
 <meta name="theme-color" content="#0f766e" />
-<meta name="app-build" content="20260913-1500" />
+<meta name="app-build" content="20260913-1700" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,20 +36,24 @@
     --accent-a: #0f766e;
     --accent-b: #0e7490;
     --error: #e11d48;
-    /* Mood ordinal ramp (5 steps, 0–4, matching anxiety's 5-point scale)
-       — one hue, monotone lightness, validated against the white card
-       surface with scripts/validate_palette.js --ordinal (light→dark
-       order below). Reuses a subset of the original 7-step ramp's
-       already-validated colors rather than inventing new ones. */
+    /* Mood ordinal ramp (5 steps) — one hue, monotone lightness,
+       validated against the white card surface with
+       scripts/validate_palette.js --ordinal (light→dark order below).
+       Reuses a subset of the original 7-step ramp's already-validated
+       colors rather than inventing new ones. Variable names stay
+       0-indexed (step 0.. step 4) as plain ramp positions; the score
+       shown on screen is 1–5 — see MOOD_COLORS in the script, which
+       maps score 1→step 0 .. score 5→step 4. */
     --mood-0: #7fbfb2;
     --mood-1: #3d9c8c;
     --mood-2: #237f70;
     --mood-3: #0f6355;
     --mood-4: #03241e;
-    /* Anxiety ordinal ramp (5 steps, 0–4) — a separate hue (amber) from
+    /* Anxiety ordinal ramp (5 steps) — a separate hue (amber) from
        mood's teal, since the two are different measurements (dataviz:
        each series gets one hue; reusing mood's teal for a different
-       axis would read as the same quantity). Validated the same way. */
+       axis would read as the same quantity). Validated the same way;
+       same 0-indexed step naming, same 1–5 on-screen score. */
     --anxiety-0: #e49444;
     --anxiety-1: #d2781e;
     --anxiety-2: #a15c17;
@@ -1201,12 +1205,12 @@
           <button type="button" data-window="90">90日</button>
         </div>
         <div class="sub-chart">
-          <div class="sub-chart-title">気分（0〜4）</div>
+          <div class="sub-chart-title">気分（1〜5）</div>
           <div class="chart-tooltip placeholder" id="analysisTooltip">点をタップすると詳細を表示します</div>
           <svg class="chart-svg" id="analysisSvg" viewBox="0 0 320 130" preserveAspectRatio="none"></svg>
         </div>
         <div class="sub-chart">
-          <div class="sub-chart-title">不安（0〜4）</div>
+          <div class="sub-chart-title">不安（1〜5）</div>
           <div class="chart-tooltip placeholder" id="anxietyTrendTooltip">点をタップすると詳細を表示します</div>
           <svg class="chart-svg" id="anxietyTrendSvg" viewBox="0 0 320 130" preserveAspectRatio="none"></svg>
         </div>
@@ -1372,9 +1376,13 @@
   }
 
   // Adds a line's draw-in animation (stroke grows from nothing to full
-  // length) and pops each of its data dots in with a slight bounce —
-  // makes a re-rendered chart read as "here's what changed" instead of
-  // an instant, static swap.
+  // length, like a wire being strung out point to point) and pops each
+  // of its data dots in right as the line reaches that point — like
+  // utility poles lighting up as the wire between them goes taut,
+  // rather than every dot popping in together while the line is still
+  // catching up to them. Matches the .chart-line-draw transition
+  // duration in CSS, kept here so dot timing can be computed from it.
+  const LINE_DRAW_MS = 900;
   function animateLineDraw(pathEl){
     const len = pathEl.getTotalLength();
     pathEl.style.strokeDasharray = `${len}`;
@@ -1382,38 +1390,47 @@
     pathEl.classList.add('chart-line-draw');
     raf2(() => { pathEl.style.strokeDashoffset = '0'; });
   }
+  // Delay for the i-th of `total` points along a line that draws in
+  // over LINE_DRAW_MS, so a dot's pop-in lines up with the moment the
+  // wire visually reaches its x-position.
+  function dotDelayFor(i, total){
+    return total <= 1 ? 0 : Math.round(i / (total - 1) * LINE_DRAW_MS);
+  }
   function popInDot(dotEl, delayMs){
     dotEl.classList.add('chart-dot-pop');
     dotEl.style.animationDelay = `${delayMs}ms`;
   }
 
-  // 5-point scale (0–4), matching anxiety's scale below — both use the
-  // same number of grades so the two axes read as comparably-grained.
-  const MOOD_MIN = 0, MOOD_MAX = 4, MOOD_MID = 2;
+  // 5-point scale, scored 1–5 (not 0-indexed) so the number on screen
+  // matches the score a person would actually say out loud — anxiety
+  // uses the same 1–5 range so the two axes read as comparably-grained.
+  // The CSS ramp variables (--mood-0.. --mood-4) keep their original
+  // 0-indexed names since they're just the 5 ramp steps, not the score.
+  const MOOD_MIN = 1, MOOD_MAX = 5, MOOD_MID = 3;
   const MOOD_COLORS = {
-    0:'var(--mood-0)', 1:'var(--mood-1)', 2:'var(--mood-2)', 3:'var(--mood-3)', 4:'var(--mood-4)'
+    1:'var(--mood-0)', 2:'var(--mood-1)', 3:'var(--mood-2)', 4:'var(--mood-3)', 5:'var(--mood-4)'
   };
-  const MOOD_TEXT_COLORS = { 0:'var(--on-surface)', 1:'var(--on-surface)', 2:'#ffffff', 3:'#ffffff', 4:'#ffffff' };
+  const MOOD_TEXT_COLORS = { 1:'var(--on-surface)', 2:'var(--on-surface)', 3:'#ffffff', 4:'#ffffff', 5:'#ffffff' };
   const MOOD_LABELS = {
-    0:'とても悪い', 1:'悪い', 2:'普通', 3:'良い', 4:'とても良い'
+    1:'とても悪い', 2:'悪い', 3:'普通', 4:'良い', 5:'とても良い'
   };
   // Small facial-expression emoji shown alongside the text label in the
   // mood history list, so a row is readable at a glance without reading
   // the words first.
-  const MOOD_EMOJI = { 0:'😞', 1:'🙁', 2:'😐', 3:'🙂', 4:'😄' };
+  const MOOD_EMOJI = { 1:'😞', 2:'🙁', 3:'😐', 4:'🙂', 5:'😄' };
 
-  const ANXIETY_MIN = 0, ANXIETY_MAX = 4, ANXIETY_MID = 2;
-  const ANXIETY_COLORS = { 0:'var(--anxiety-0)', 1:'var(--anxiety-1)', 2:'var(--anxiety-2)', 3:'var(--anxiety-3)', 4:'var(--anxiety-4)' };
-  const ANXIETY_TEXT_COLORS = { 0:'var(--on-surface)', 1:'var(--on-surface)', 2:'#ffffff', 3:'#ffffff', 4:'#ffffff' };
+  const ANXIETY_MIN = 1, ANXIETY_MAX = 5, ANXIETY_MID = 3;
+  const ANXIETY_COLORS = { 1:'var(--anxiety-0)', 2:'var(--anxiety-1)', 3:'var(--anxiety-2)', 4:'var(--anxiety-3)', 5:'var(--anxiety-4)' };
+  const ANXIETY_TEXT_COLORS = { 1:'var(--on-surface)', 2:'var(--on-surface)', 3:'#ffffff', 4:'#ffffff', 5:'#ffffff' };
   const ANXIETY_LABELS = {
-    0:'不安なし', 1:'少し不安', 2:'やや不安', 3:'強い不安', 4:'非常に強い不安'
+    1:'不安なし', 2:'少し不安', 3:'やや不安', 4:'強い不安', 5:'非常に強い不安'
   };
-  const ANXIETY_EMOJI = { 0:'😌', 1:'🙂', 2:'😟', 3:'😰', 4:'😱' };
+  const ANXIETY_EMOJI = { 1:'😌', 2:'🙂', 3:'😟', 4:'😰', 5:'😱' };
   // Shorter labels for the picker only (the "不安" section heading already
   // says what's being rated, so repeating it on every chip is redundant) —
   // history/tooltips keep the full ANXIETY_LABELS above.
   const ANXIETY_PICKER_LABELS = {
-    0:'なし', 1:'少し', 2:'やや', 3:'強い', 4:'非常に強い'
+    1:'なし', 2:'少し', 3:'やや', 4:'強い', 5:'非常に強い'
   };
   function hasAnxiety(entry){ return typeof entry.anxiety === 'number'; }
 
@@ -1582,19 +1599,39 @@
   // entries: [{ts, level}], newest first
   let moods = loadArray(MOODS_KEY).sort((a,b) => b.ts - a.ts);
 
-  // One-time migration: mood used to be a 7-point scale (0–6); it's now
+  // One-time migration: mood used to be a 7-point scale (0–6); it became
   // 5-point (0–4) to match anxiety. Compress any old values down (rounds
-  // to the nearest new grade) so existing history keeps its ordering
-  // instead of breaking on colors/labels that no longer go past 4.
-  (function migrateMoodScale(){
+  // to the nearest new grade). Bounds here are the literal old values
+  // (0 and 4), not the MOOD_MIN/MOOD_MAX constants above — those have
+  // since moved on to the 1–5 scale (see the V3 migration below), and
+  // this step must keep doing exactly what it always did regardless.
+  (function migrateMoodScaleV2(){
     const FLAG = 'daily-private-memo.moodScaleMigratedV2';
     if (localStorage.getItem(FLAG)) return;
     let changed = false;
     moods.forEach(m => {
-      if (typeof m.level === 'number' && m.level > MOOD_MAX){
-        m.level = Math.max(MOOD_MIN, Math.min(MOOD_MAX, Math.round(m.level * MOOD_MAX / 6)));
+      if (typeof m.level === 'number' && m.level > 4){
+        m.level = Math.max(0, Math.min(4, Math.round(m.level * 4 / 6)));
         changed = true;
       }
+    });
+    if (changed) saveArray(MOODS_KEY, moods);
+    try{ localStorage.setItem(FLAG, '1'); }catch(e){ /* ignore */ }
+  })();
+
+  // One-time migration: mood and anxiety were both 0-indexed (0–4);
+  // both are now scored 1–5, so the number on screen matches what
+  // someone would actually say out loud ("3", not "level 2"). Runs
+  // after the V2 step above, so by this point mood.level is guaranteed
+  // to already be within 0–4 — anxiety was always natively 0–4 and had
+  // never been migrated before this, so both get the same flat +1 here.
+  (function migrateScaleToOneIndexed(){
+    const FLAG = 'daily-private-memo.scoreScaleMigratedV3';
+    if (localStorage.getItem(FLAG)) return;
+    let changed = false;
+    moods.forEach(m => {
+      if (typeof m.level === 'number'){ m.level += 1; changed = true; }
+      if (typeof m.anxiety === 'number'){ m.anxiety += 1; changed = true; }
     });
     if (changed) saveArray(MOODS_KEY, moods);
     try{ localStorage.setItem(FLAG, '1'); }catch(e){ /* ignore */ }
@@ -1933,7 +1970,7 @@
         stroke:'var(--surface-container)', 'stroke-width':'2'
       });
       daySvg.appendChild(dot);
-      popInDot(dot, i * 45);
+      popInDot(dot, dotDelayFor(i, points.length));
 
       const hit = svgEl('circle', { cx:p.x, cy:p.y, r:12, fill:'transparent' });
       hit.style.cursor = 'pointer';
@@ -2082,9 +2119,10 @@
     }
 
     const avg = mean(recentVals);
+    const scaleMin = moodLike ? MOOD_MIN : ANXIETY_MIN;
     const scaleMax = moodLike ? MOOD_MAX : ANXIETY_MAX;
     const colors = moodLike ? MOOD_COLORS : ANXIETY_COLORS;
-    const roundedLevel = Math.max(0, Math.min(scaleMax, Math.round(avg)));
+    const roundedLevel = Math.max(scaleMin, Math.min(scaleMax, Math.round(avg)));
 
     valueEl.textContent = '0.0';
     animateNumber(valueEl, avg, 1);
@@ -2100,10 +2138,11 @@
       }
     }
 
-    // Meter: fill = the value's position on the 0〜{scaleMax} scale,
-    // colored by the same ordinal ramp used everywhere else for that
-    // metric — so "3.0" isn't just a number, it visibly sits near one
-    // end of the bar or the other.
+    // Meter: fill = the value's position on the {scaleMin}〜{scaleMax}
+    // scale, colored by the same ordinal ramp used everywhere else for
+    // that metric — so "3.0" isn't just a number, it visibly sits near
+    // one end of the bar or the other. Normalized against scaleMin (not
+    // just avg/scaleMax) since the scale doesn't start at 0.
     const meter = document.createElement('div');
     meter.className = 'meter';
     const fill = document.createElement('div');
@@ -2115,7 +2154,7 @@
     wrap.appendChild(valueEl);
     wrap.appendChild(meter);
     wrap.appendChild(deltaEl);
-    raf2(() => { fill.style.width = `${avg / scaleMax * 100}%`; });
+    raf2(() => { fill.style.width = `${(avg - scaleMin) / (scaleMax - scaleMin) * 100}%`; });
     return wrap;
   }
 
@@ -2180,7 +2219,7 @@
           push(`${bucket}に不安が${diff > 0 ? '高め' : '低め'}です`,
             `${bucket}の平均不安 ${mean(vals).toFixed(1)} ／ その他の時間帯 ${mean(others).toFixed(1)}`,
             diff, ANXIETY_MAX, Math.min(vals.length, others.length),
-            { aLabel: bucket, aValue: mean(vals), bLabel: 'その他', bValue: mean(others), max: ANXIETY_MAX, colors: ANXIETY_COLORS });
+            { aLabel: bucket, aValue: mean(vals), bLabel: 'その他', bValue: mean(others), min: ANXIETY_MIN, max: ANXIETY_MAX, colors: ANXIETY_COLORS });
         }
       });
     }
@@ -2201,7 +2240,7 @@
               push(`「${theme}」に関するメモがある時に不安が高めです`,
                 `平均不安 ${mean(themeAnxiety).toFixed(1)} ／ 全体平均 ${mean(overallAnxiety).toFixed(1)}`,
                 diff, ANXIETY_MAX, themeAnxiety.length,
-                { aLabel: theme, aValue: mean(themeAnxiety), bLabel: '全体', bValue: mean(overallAnxiety), max: ANXIETY_MAX, colors: ANXIETY_COLORS });
+                { aLabel: theme, aValue: mean(themeAnxiety), bLabel: '全体', bValue: mean(overallAnxiety), min: ANXIETY_MIN, max: ANXIETY_MAX, colors: ANXIETY_COLORS });
             }
           }
           const themeMood = themeEntries.map(e => e.level);
@@ -2211,7 +2250,7 @@
               push(`「${theme}」に関するメモがある時に気分が低めです`,
                 `平均気分 ${mean(themeMood).toFixed(1)} ／ 全体平均 ${mean(overallMood).toFixed(1)}`,
                 diff, MOOD_MAX, themeMood.length,
-                { aLabel: theme, aValue: mean(themeMood), bLabel: '全体', bValue: mean(overallMood), max: MOOD_MAX, colors: MOOD_COLORS });
+                { aLabel: theme, aValue: mean(themeMood), bLabel: '全体', bValue: mean(overallMood), min: MOOD_MIN, max: MOOD_MAX, colors: MOOD_COLORS });
             }
           }
         });
@@ -2258,7 +2297,7 @@
       track.className = 'track';
       const fill = document.createElement('span');
       fill.className = 'fill';
-      const roundedLevel = Math.max(0, Math.min(compare.max, Math.round(row.value)));
+      const roundedLevel = Math.max(compare.min, Math.min(compare.max, Math.round(row.value)));
       fill.style.background = compare.colors[roundedLevel];
       track.appendChild(fill);
       const val = document.createElement('span');
@@ -2268,7 +2307,7 @@
       rowEl.appendChild(track);
       rowEl.appendChild(val);
       wrap.appendChild(rowEl);
-      raf2(() => { fill.style.width = `${row.value / compare.max * 100}%`; });
+      raf2(() => { fill.style.width = `${(row.value - compare.min) / (compare.max - compare.min) * 100}%`; });
     });
     return wrap;
   }
@@ -2349,8 +2388,8 @@
       memoSummaryBodyEl.textContent = 'まだ十分なメモがありません。';
       return;
     }
-    const anxious = tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 3);
-    const good = tagged.filter(t => t.entry.level >= 3);
+    const anxious = tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 4);
+    const good = tagged.filter(t => t.entry.level >= 4);
     let html = '';
     if (anxious.length >= MIN_SAMPLE){
       const top = Array.from(countThemes(anxious).entries()).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([t])=>t);
@@ -2436,7 +2475,7 @@
         stroke:'var(--surface-container)', 'stroke-width':'2'
       });
       analysisSvg.appendChild(dot);
-      popInDot(dot, i * 45);
+      popInDot(dot, dotDelayFor(i, points.length));
       const hit = svgEl('circle', { cx:p.x, cy:p.y, r:12, fill:'transparent' });
       hit.style.cursor = 'pointer';
       hit.addEventListener('click', () => showTrendTooltip(p.point));
@@ -2520,7 +2559,7 @@
         stroke:'var(--surface-container)', 'stroke-width':'2'
       });
       anxietyTrendSvg.appendChild(dot);
-      popInDot(dot, i * 45);
+      popInDot(dot, dotDelayFor(i, points.length));
       const hit = svgEl('circle', { cx:p.x, cy:p.y, r:12, fill:'transparent' });
       hit.style.cursor = 'pointer';
       hit.addEventListener('click', () => showAnxietyTrendTooltip(p.point));
@@ -2956,9 +2995,9 @@
     });
     body.appendChild(statWrap);
 
-    appendTopThemesBlock(body, '不安が強い時に多いテーマ（不安3〜4）', tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 3));
-    appendTopThemesBlock(body, '気分が低い時に多いテーマ（気分0〜1）', tagged.filter(t => t.entry.level <= 1));
-    appendTopThemesBlock(body, '気分が良い時に多いテーマ（気分3〜4）', tagged.filter(t => t.entry.level >= 3));
+    appendTopThemesBlock(body, '不安が強い時に多いテーマ（不安4〜5）', tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 4));
+    appendTopThemesBlock(body, '気分が低い時に多いテーマ（気分1〜2）', tagged.filter(t => t.entry.level <= 2));
+    appendTopThemesBlock(body, '気分が良い時に多いテーマ（気分4〜5）', tagged.filter(t => t.entry.level >= 4));
   }
 
   // Moved out of renderMemoAnalysis() (分析タブ) into the 記録タブ側の
