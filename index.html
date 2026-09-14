@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Daily Log" />
 <meta name="theme-color" content="#0f766e" />
-<meta name="app-build" content="20260913-1900" />
+<meta name="app-build" content="20260914-1100" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2446,23 +2446,35 @@
   }
 
   /* ---- 4. メモから見えること（要約のみ、詳細は「詳しく見る」） ---- */
+  // Turns a themed subset into a natural-language clause about which
+  // themes show up most in it, or an honest explanation of why it
+  // can't say yet — the building block for every memo-analysis
+  // sentence below, so nothing renders as a bare label:count/"データ
+  // 不足" pair without saying what that means.
+  function themesPhrase(taggedSubset, count){
+    count = count || 2;
+    if (taggedSubset.length < MIN_SAMPLE){
+      const need = MIN_SAMPLE - taggedSubset.length;
+      return { ok:false, text:`まだ記録が少なく（あと${need}件ほどで表示されます）、はっきりしたテーマは見えていません` };
+    }
+    const top = Array.from(countThemes(taggedSubset).entries()).sort((a,b)=>b[1]-a[1]).slice(0,count).map(([t])=>t);
+    return { ok:true, text:`「${top.join('」「')}」の話題がよく書かれています`, themes:top };
+  }
+
   function renderMemoSummary(){
     const tagged = getMemoTaggedEntries();
     if (tagged.length < MIN_SAMPLE){
-      memoSummaryBodyEl.textContent = 'まだ十分なメモがありません。';
+      memoSummaryBodyEl.textContent = 'ひとことメモがもう少し増えると、そこから見えてくる傾向をここで説明します。';
       return;
     }
-    const anxious = tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 4);
-    const good = tagged.filter(t => t.entry.level >= 4);
-    let html = '';
-    if (anxious.length >= MIN_SAMPLE){
-      const top = Array.from(countThemes(anxious).entries()).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([t])=>t);
-      html += `<div class="rec-summary-line"><strong>不安が強い時に多いテーマ</strong>　${top.join('・')}</div>`;
-    }
-    if (good.length >= MIN_SAMPLE){
-      html += `<div class="rec-summary-line" style="margin-top:0.5rem;"><strong>気分が良い時に多いテーマ</strong>　${Array.from(countThemes(good).entries()).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([t])=>t).join('・')}</div>`;
-    }
-    memoSummaryBodyEl.innerHTML = html || 'まだ十分なデータがありません。';
+    const anxious = themesPhrase(tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 4));
+    const good = themesPhrase(tagged.filter(t => t.entry.level >= 4));
+    const sentences = [];
+    if (anxious.ok) sentences.push(`不安が強いときのメモには、${anxious.text}。`);
+    if (good.ok) sentences.push(`気分が良いときのメモには、${good.text}。`);
+    memoSummaryBodyEl.innerHTML = sentences.length > 0
+      ? sentences.map(s => `<p class="rec-summary-line">${s}</p>`).join('')
+      : 'まだ、気分や不安とはっきり結びつくテーマは見えていません。';
   }
 
   function renderAnalysis(){
@@ -2946,22 +2958,6 @@
     return h;
   }
 
-  function appendTopThemesBlock(body, title, taggedSubset){
-    body.appendChild(memoSectionTitle(title));
-    if (taggedSubset.length < MIN_SAMPLE){
-      const p = document.createElement('p');
-      p.className = 'note';
-      p.textContent = 'データ不足';
-      body.appendChild(p);
-      return;
-    }
-    const sorted = Array.from(countThemes(taggedSubset).entries()).sort((a,b)=>b[1]-a[1]).slice(0,3);
-    const p = document.createElement('p');
-    p.className = 'note';
-    p.textContent = sorted.map(([theme],i) => `${i+1}. ${theme}`).join('　');
-    body.appendChild(p);
-  }
-
   function appendThemeShareBlock(body, title, taggedSubset){
     body.appendChild(memoSectionTitle(title));
     if (taggedSubset.length < MIN_SAMPLE){
@@ -3017,51 +3013,60 @@
     return { before, after };
   }
 
+  function appendNarrative(body, text){
+    const p = document.createElement('p');
+    p.className = 'rec-summary-text';
+    p.textContent = text;
+    body.appendChild(p);
+  }
+
+  // Reads like a short written summary rather than a label:value dump —
+  // every number here is wrapped in a sentence that says what it means,
+  // so it's legible without first decoding what "気分4〜5" or "データ
+  // 不足" implies. Still backed by the exact same underlying numbers
+  // (theme counts, per-theme averages) as before.
   function renderMemoAnalysis(){
     const body = document.getElementById('memoAnalysisBody');
     body.innerHTML = '';
     const tagged = getMemoTaggedEntries();
     if (tagged.length < MIN_SAMPLE){
-      body.innerHTML = '<p class="note">まだ十分なメモがありません。</p>';
+      body.innerHTML = '<p class="note">まだ十分なメモがありません。ひとことメモを書いていくと、そこから見えてくるテーマや気分との関係をここで説明します。</p>';
       return;
     }
 
-    const counts = countThemes(tagged);
-    const sorted = Array.from(counts.entries()).sort((a,b) => b[1]-a[1]);
+    const sorted = Array.from(countThemes(tagged).entries()).sort((a,b) => b[1]-a[1]);
+    const [topTheme, topCount] = sorted[0];
+    const second = sorted[1];
 
-    body.appendChild(memoSectionTitle('よく出るテーマ'));
-    const freqWrap = document.createElement('div');
-    freqWrap.className = 'freq-rows';
-    sorted.forEach(([theme, count]) => {
-      const row = document.createElement('div');
-      row.className = 'freq-row';
-      row.innerHTML = `<span class="tag">${theme}</span><span class="vals">${count}件</span>`;
-      freqWrap.appendChild(row);
-    });
-    body.appendChild(freqWrap);
+    // 1. overview — what themes come up at all, and how often
+    let overview = `これまでに書いたひとことメモ${tagged.length}件を見ると、もっとも多いテーマは「${topTheme}」（${topCount}件）`;
+    overview += second ? `、次いで「${second[0]}」（${second[1]}件）でした。` : `でした。`;
+    appendNarrative(body, overview);
 
-    body.appendChild(memoSectionTitle('テーマ別 平均気分・平均不安'));
-    const statWrap = document.createElement('div');
-    statWrap.className = 'freq-rows';
+    // 2. per-theme mood/anxiety averages, one sentence per theme —
+    // only for themes with enough entries to average honestly
+    body.appendChild(memoSectionTitle('テーマ別の気分・不安'));
+    let anyThemeStat = false;
     sorted.forEach(([theme]) => {
       const themeEntries = tagged.filter(t => t.categories.includes(theme)).map(t => t.entry);
-      const row = document.createElement('div');
-      row.className = 'freq-row';
-      if (themeEntries.length < MIN_SAMPLE){
-        row.innerHTML = `<span class="tag">${theme}</span><span class="vals">データ不足</span>`;
-      } else {
-        const avgMood = mean(themeEntries.map(e => e.level));
-        const anxietyVals = themeEntries.filter(hasAnxiety).map(e => e.anxiety);
-        const anxietyTxt = anxietyVals.length > 0 ? mean(anxietyVals).toFixed(1) : 'データなし';
-        row.innerHTML = `<span class="tag">${theme}（${themeEntries.length}件）</span><span class="vals">気分 ${avgMood.toFixed(1)} ・ 不安 ${anxietyTxt}</span>`;
-      }
-      statWrap.appendChild(row);
+      if (themeEntries.length < MIN_SAMPLE) return;
+      anyThemeStat = true;
+      const avgMood = mean(themeEntries.map(e => e.level));
+      const anxietyVals = themeEntries.filter(hasAnxiety).map(e => e.anxiety);
+      const anxietyClause = anxietyVals.length > 0 ? `不安は平均${mean(anxietyVals).toFixed(1)}` : '不安の記録はまだありません';
+      appendNarrative(body, `「${theme}」のメモがあるとき（${themeEntries.length}件）は、気分が平均${avgMood.toFixed(1)}、${anxietyClause}でした。`);
     });
-    body.appendChild(statWrap);
+    if (!anyThemeStat) appendNarrative(body, 'まだどのテーマも記録が少なく、テーマごとの気分・不安の違いは判断できません。');
 
-    appendTopThemesBlock(body, '不安が強い時に多いテーマ（不安4〜5）', tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 4));
-    appendTopThemesBlock(body, '気分が低い時に多いテーマ（気分0〜1）', tagged.filter(t => t.entry.level <= 1));
-    appendTopThemesBlock(body, '気分が良い時に多いテーマ（気分4〜5）', tagged.filter(t => t.entry.level >= 4));
+    // 3–5. mood/anxiety extremes — which themes cluster there, in
+    // plain sentences instead of a bare list or "データ不足"
+    body.appendChild(memoSectionTitle('気分・不安との関係'));
+    const anxious = themesPhrase(tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 4), 3);
+    appendNarrative(body, `不安が特に強いとき（不安4〜5）のメモは、${anxious.text}。`);
+    const low = themesPhrase(tagged.filter(t => t.entry.level <= 1), 3);
+    appendNarrative(body, `気分が低いとき（気分0〜1）のメモは、${low.text}。`);
+    const good = themesPhrase(tagged.filter(t => t.entry.level >= 4), 3);
+    appendNarrative(body, `気分が良いとき（気分4〜5）のメモは、${good.text}。`);
   }
 
   // Moved out of renderMemoAnalysis() (分析タブ) into the 記録タブ側の
