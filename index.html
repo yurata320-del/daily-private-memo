@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Daily Log" />
 <meta name="theme-color" content="#0f766e" />
-<meta name="app-build" content="20260914-1100" />
+<meta name="app-build" content="20260914-1300" />
 <title>Daily Log</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -682,6 +682,48 @@
     box-shadow:0 4px 10px rgba(15,118,110,0.28);
   }
 
+  /* ---- Executive summary: one integrated, narrative read of "how
+     things are going", built from the same signals as the sections
+     below it instead of repeating them as separate label:value rows.
+     Used both in 分析 (mood/anxiety/memo) and 記録 (自慰行為). A
+     left accent bar + small caps title mark it as the headline read;
+     the note below is visually demoted (smaller, divider, muted) so
+     the disclaimer reads as a footnote, not part of the narrative. */
+  .exec-summary-card{
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    border-left:4px solid var(--primary);
+    box-shadow:var(--glass-shadow);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    border-radius:1.5rem;
+    padding:1.3rem 1.25rem;
+    margin-bottom:1.5rem;
+  }
+  .exec-summary-card[hidden]{ display:none; }
+  .exec-summary-title{
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.06em;
+    color:var(--primary);
+    text-transform:uppercase;
+    margin-bottom:0.7rem;
+  }
+  .exec-summary-text{
+    font-size:14.5px;
+    line-height:1.8;
+    color:var(--on-surface);
+    margin:0;
+  }
+  .exec-summary-note{
+    font-size:11px;
+    line-height:1.6;
+    color:var(--on-surface-variant);
+    margin:0.8rem 0 0;
+    padding-top:0.7rem;
+    border-top:1px solid var(--outline);
+  }
+
   /* ---- Analysis: results-first layout ---- */
   .recent-card{
     background:var(--glass);
@@ -1105,7 +1147,11 @@
       <!-- 自慰行為との分析 — 気分/分析タブとは完全に分離。診察時に「気分」
            「分析」タブだけ見せられるよう、このタブにしか出てこない。 -->
       <div class="section-header" style="margin-top:2rem;"><h2>自慰行為との関連</h2></div>
-      <div class="insight-card tight" id="recSummaryBody"></div>
+      <div class="exec-summary-card" id="recSummaryCard">
+        <div class="exec-summary-title">エグゼクティブサマリー</div>
+        <p class="exec-summary-text" id="recSummaryText"></p>
+        <p class="exec-summary-note" id="recSummaryNote"></p>
+      </div>
       <button class="detail-toggle" id="recDetailToggle" type="button">詳しく見る</button>
       <div class="detail-area" id="recDetailArea" hidden>
         <details class="rec-section" id="recFreqSection">
@@ -1201,6 +1247,13 @@
         <h1>分析</h1>
         <p class="subtitle">最近の自分の状態</p>
       </header>
+
+      <!-- 0. エグゼクティブサマリー — 気分・不安・メモを統合した文章 -->
+      <div class="exec-summary-card" id="execSummaryCard" hidden>
+        <div class="exec-summary-title">エグゼクティブサマリー</div>
+        <p class="exec-summary-text" id="execSummaryText"></p>
+        <p class="exec-summary-note" id="execSummaryNote"></p>
+      </div>
 
       <!-- 1. 最近7日間 -->
       <div class="recent-card">
@@ -2067,7 +2120,11 @@
   const recentSummaryEl = document.getElementById('recentSummary');
   const recentAsideEl = document.getElementById('recentAside');
   const findingsListEl = document.getElementById('findingsList');
-  const recSummaryBodyEl = document.getElementById('recSummaryBody');
+  const execSummaryCardEl = document.getElementById('execSummaryCard');
+  const execSummaryTextEl = document.getElementById('execSummaryText');
+  const execSummaryNoteEl = document.getElementById('execSummaryNote');
+  const recSummaryTextEl = document.getElementById('recSummaryText');
+  const recSummaryNoteEl = document.getElementById('recSummaryNote');
   const memoSummaryBodyEl = document.getElementById('memoSummaryBody');
   const recDetailToggleEl = document.getElementById('recDetailToggle');
   const recDetailAreaEl = document.getElementById('recDetailArea');
@@ -2410,39 +2467,75 @@
     });
   }
 
-  /* ---- 記録タブ: 自慰行為との関連（1セクションに集約） ---- */
-  function renderRecSummary(){
-    if (records.length === 0){
-      recSummaryBodyEl.textContent = 'まだ自慰行為の記録がありません。';
-      return;
-    }
-    const now = Date.now();
-    const count30 = records.filter(ts => ts >= now - 30*DAY_MS).length;
-    const { before, after, comparedCount } = collectAroundWindows(3);
+  const EXEC_SUMMARY_NOTE = 'これは記録から読み取れる一つの見立て（仮説）であり、診断ではありません。気になる変化があれば、この記録を次の診察の参考にしてみてください。';
 
-    let html = `<div class="rec-summary-line"><strong>過去30日</strong>　${count30}回</div>`;
+  /* ---- 記録タブ: 自慰行為との関連 — エグゼクティブサマリー ----
+     Weaves frequency, before/after mood・不安, day-level comparison,
+     time-of-day concentration, and the surrounding memo themes into
+     one narrative — the numbers behind it still live in the collapsed
+     "詳しく見る" sections below, unchanged. */
+  function computeRecExecutiveSummary(){
+    if (records.length < MIN_SAMPLE) return null;
+    const now = Date.now();
+    const f = computeRecFrequency();
+    const parts = [];
+
+    parts.push(`直近30日間の記録は${f.count30}回、週あたり平均${f.weeklyAvg.toFixed(1)}回のペースです。`);
+
+    const { before, after, comparedCount } = collectAroundWindows(3);
     const moodOk = before.mood.length >= MIN_SAMPLE && after.mood.length >= MIN_SAMPLE;
     const anxietyOk = before.anxiety.length >= MIN_SAMPLE && after.anxiety.length >= MIN_SAMPLE;
-
     if (moodOk || anxietyOk){
-      html += `<div class="rec-summary-line" style="margin-top:0.5rem;">比較できた記録：${comparedCount}回</div>`;
-      if (moodOk) html += `<div class="rec-summary-line">気分　前 ${mean(before.mood).toFixed(1)} → 後 ${mean(after.mood).toFixed(1)}</div>`;
-      if (anxietyOk) html += `<div class="rec-summary-line">不安　前 ${mean(before.anxiety).toFixed(1)} → 後 ${mean(after.anxiety).toFixed(1)}</div>`;
-
-      let sentence = '';
+      const clauses = [];
+      if (moodOk){
+        const d = mean(after.mood) - mean(before.mood);
+        if (Math.abs(d) >= 0.3) clauses.push(d > 0 ? '気分は前より後の方が良く' : '気分は前より後の方が低く');
+      }
       if (anxietyOk){
         const d = mean(after.anxiety) - mean(before.anxiety);
-        if (Math.abs(d) >= 0.3) sentence = d < 0 ? '記録上、自慰行為後は不安が低い傾向があります。' : '記録上、自慰行為後は不安が高い傾向があります。';
+        if (Math.abs(d) >= 0.3) clauses.push(d < 0 ? '不安は前より後の方が低い' : '不安は前より後の方が高い');
       }
-      if (!sentence && moodOk){
-        const d = mean(after.mood) - mean(before.mood);
-        if (Math.abs(d) >= 0.3) sentence = d > 0 ? '記録上、自慰行為後は気分が良い傾向があります。' : '記録上、自慰行為後は気分が低い傾向があります。';
-      }
-      if (sentence) html += `<p class="rec-summary-text">${sentence}</p>`;
-    } else {
-      html += `<p class="rec-summary-text">まだ十分なデータがありません。</p>`;
+      if (clauses.length > 0) parts.push(`前後${comparedCount}回分の記録を比べると、${clauses.join('、')}傾向が見られます。`);
     }
-    recSummaryBodyEl.innerHTML = html;
+
+    const byDate = groupDaysByMoodAnxiety();
+    const recordDayKeys = new Set(records.map(ts => localDateStr(ts)));
+    const withDaysMood = [], withoutDaysMood = [];
+    byDate.forEach((v, key) => {
+      (recordDayKeys.has(key) ? withDaysMood : withoutDaysMood).push(mean(v.mood));
+    });
+    if (withDaysMood.length >= MIN_SAMPLE && withoutDaysMood.length >= MIN_SAMPLE){
+      const d = mean(withDaysMood) - mean(withoutDaysMood);
+      if (Math.abs(d) >= 0.3) parts.push(`自慰行為があった日はなかった日に比べて、気分が${d > 0 ? '高め' : '低め'}です。`);
+    }
+
+    if (records.length >= MIN_SAMPLE){
+      const counts = REC_TOD_BUCKETS.map(b => records.filter(ts => b.test(new Date(ts).getHours())).length);
+      const total = counts.reduce((a,b) => a+b, 0);
+      const maxIdx = counts.indexOf(Math.max(...counts));
+      const share = total > 0 ? counts[maxIdx] / total : 0;
+      if (share >= 0.4) parts.push(`時間帯は${REC_TOD_BUCKETS[maxIdx].label}に集中しています。`);
+    }
+
+    const { after: memoAfter } = collectAroundMemoWindows(3);
+    const afterThemes = themesPhrase(memoAfter, 2);
+    if (afterThemes.ok) parts.push(`直後のメモには${afterThemes.text}。`);
+
+    if (parts.length <= 1) return null;
+    return { text: parts.join(''), note: EXEC_SUMMARY_NOTE };
+  }
+
+  function renderRecSummary(){
+    const summary = computeRecExecutiveSummary();
+    if (!summary){
+      recSummaryTextEl.textContent = records.length === 0
+        ? 'まだ自慰行為の記録がありません。'
+        : 'まだデータが少なく、傾向をまとめられません。記録が増えると、ここに見立てが表示されます。';
+      recSummaryNoteEl.textContent = '';
+      return;
+    }
+    recSummaryTextEl.textContent = summary.text;
+    recSummaryNoteEl.textContent = summary.note;
   }
 
   /* ---- 4. メモから見えること（要約のみ、詳細は「詳しく見る」） ---- */
@@ -2477,7 +2570,80 @@
       : 'まだ、気分や不安とはっきり結びつくテーマは見えていません。';
   }
 
+  /* ---- 0. エグゼクティブサマリー（分析タブ） ----
+     One integrated read of mood + anxiety + memo themes, woven from
+     the same signals as 最近7日間・最近の傾向・メモから見えること
+     below it — never touches `records`/自慰行為, same as the rest of
+     this tab (see renderRecordAnalysis's note on why). */
+  function computeExecutiveSummary(){
+    if (moods.length < MIN_SAMPLE) return null;
+    const now = Date.now();
+    const recent7 = moods.filter(m => m.ts >= now - 7*DAY_MS);
+    const prior7 = moods.filter(m => m.ts >= now - 14*DAY_MS && m.ts < now - 7*DAY_MS);
+    const recentMood = recent7.map(m => m.level);
+    const recentAnxiety = recent7.filter(hasAnxiety).map(m => m.anxiety);
+    const priorMood = prior7.map(m => m.level);
+
+    const parts = [];
+
+    if (recentMood.length > 0){
+      const avgMood = mean(recentMood);
+      const roundedMood = Math.max(MOOD_MIN, Math.min(MOOD_MAX, Math.round(avgMood)));
+      let opening = `直近1週間は気分が平均${avgMood.toFixed(1)}（「${MOOD_LABELS[roundedMood]}」に近い状態）`;
+      if (recentAnxiety.length > 0){
+        const avgAnxiety = mean(recentAnxiety);
+        const roundedAnxiety = Math.max(ANXIETY_MIN, Math.min(ANXIETY_MAX, Math.round(avgAnxiety)));
+        opening += `、不安は平均${avgAnxiety.toFixed(1)}（「${ANXIETY_LABELS[roundedAnxiety]}」に近い状態）`;
+      }
+      opening += 'で経過しています。';
+      if (priorMood.length >= MIN_SAMPLE){
+        const diff = avgMood - mean(priorMood);
+        if (Math.abs(diff) >= 0.3) opening += diff > 0 ? '前の週と比べると、持ち直してきている様子がうかがえます。' : '前の週と比べると、やや落ち込みが強くなっています。';
+      }
+      parts.push(opening);
+    }
+
+    const topFinding = computeFindings().sort((a,b) => b.score-a.score)[0];
+    if (topFinding) parts.push(`記録全体では、${topFinding.text}（${topFinding.detail}）という傾向が最も目立っています。`);
+
+    const tagged = getMemoTaggedEntries();
+    const anxious = tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 4);
+    const lowMood = tagged.filter(t => t.entry.level <= 1);
+    const goodMood = tagged.filter(t => t.entry.level >= 4);
+    const anxiousTop = anxious.length >= MIN_SAMPLE ? Array.from(countThemes(anxious).entries()).sort((a,b)=>b[1]-a[1])[0] : null;
+    const lowTop = lowMood.length >= MIN_SAMPLE ? Array.from(countThemes(lowMood).entries()).sort((a,b)=>b[1]-a[1])[0] : null;
+    const goodTop = goodMood.length >= MIN_SAMPLE ? Array.from(countThemes(goodMood).entries()).sort((a,b)=>b[1]-a[1])[0] : null;
+
+    const linking = [];
+    if (anxiousTop) linking.push(`不安が強いときのメモには「${anxiousTop[0]}」というテーマがよく登場し`);
+    if (lowTop) linking.push(`気分が落ち込んでいるときは「${lowTop[0]}」に関する記述が目立ち`);
+    if (goodTop) linking.push(`気分が良いときは「${goodTop[0]}」の話題が多く`);
+    if (linking.length > 0) parts.push(linking.join('、') + 'ます。');
+
+    if (anxiousTop || lowTop){
+      const cause = (anxiousTop || lowTop)[0];
+      parts.push(`これらを踏まえると、「${cause}」にまつわる負荷が、不安や気分の落ち込みの一因になっている可能性が考えられます。`);
+    } else if (topFinding && linking.length === 0){
+      parts.push('ひとことメモが増えると、こうした波と結びつきやすいテーマも見えてくるはずです。');
+    }
+
+    if (parts.length === 0) return null;
+    return { text: parts.join(''), note: EXEC_SUMMARY_NOTE };
+  }
+
+  function renderExecutiveSummary(){
+    const summary = computeExecutiveSummary();
+    if (!summary){
+      execSummaryCardEl.hidden = true;
+      return;
+    }
+    execSummaryCardEl.hidden = false;
+    execSummaryTextEl.textContent = summary.text;
+    execSummaryNoteEl.textContent = summary.note;
+  }
+
   function renderAnalysis(){
+    renderExecutiveSummary();
     renderRecentCard();
     updateTrendChart();
     renderFindings();
