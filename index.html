@@ -782,6 +782,11 @@
     color:var(--on-surface);
     margin:0 0 0.4rem;
   }
+  /* 数字の下に続く読み物部分。1文目（見出し的な一行）だけ本文の濃さで、
+     続く補足は一段落として軽く見せる。 */
+  #recentSummary p{ margin:0 0 0.5rem; }
+  #recentSummary p:last-child{ margin-bottom:0; }
+  #recentSummary p.sub{ font-weight:400; font-size:13px; color:var(--on-surface-variant); }
   .recent-aside{
     font-size:11px;
     color:var(--on-surface-variant);
@@ -822,6 +827,23 @@
   }
   .finding-item .headline{ font-size:14px; font-weight:600; color:var(--on-surface); margin-bottom:0.25rem; }
   .finding-item .detail{ font-size:12px; color:var(--on-surface-variant); line-height:1.5; }
+  /* 「なぜこの差を見るのか」の解説。数字（.detail）より一段下げた扱いに
+     して、読み物として続けて読めるようにする。 */
+  .finding-item .why{
+    font-size:12px;
+    color:var(--on-surface-variant);
+    line-height:1.7;
+    margin-top:0.5rem;
+    padding-top:0.5rem;
+    border-top:1px solid var(--outline);
+  }
+  .findings-lead{
+    font-size:12px;
+    color:var(--on-surface-variant);
+    line-height:1.7;
+    margin:0 0 0.2rem;
+    padding:0 0.25rem;
+  }
   .findings-empty{
     font-size:13px;
     color:var(--on-surface-variant);
@@ -1264,7 +1286,7 @@
       <div class="recent-card">
         <div class="recent-card-title">最近7日間</div>
         <div class="recent-metrics" id="recentMetrics"></div>
-        <p class="recent-summary" id="recentSummary"></p>
+        <div class="recent-summary" id="recentSummary"></div>
         <p class="recent-aside" id="recentAside"></p>
       </div>
 
@@ -2298,24 +2320,73 @@
     recentMetricsEl.appendChild(buildRecentMetric('不安', recentAnxiety, priorAnxiety, false));
     recentAsideEl.textContent = recent7.length > 0 ? `7日間に${recent7.length}件記録` : '';
 
-    let moodPhrase = null, anxietyPhrase = null;
-    if (recentMood.length > 0 && priorMood.length > 0){
-      const diff = mean(recentMood) - mean(priorMood);
-      moodPhrase = Math.abs(diff) < 0.3 ? '気分はほぼ横ばい' : (diff > 0 ? '気分は上向き' : '気分はやや下向き');
-    }
-    if (recentAnxiety.length > 0 && priorAnxiety.length > 0){
-      const diff = mean(recentAnxiety) - mean(priorAnxiety);
-      anxietyPhrase = Math.abs(diff) < 0.3 ? '不安もほぼ横ばいです' : (diff > 0 ? '不安は少し高くなっています' : '不安は少し低くなっています');
-    }
-    if (moodPhrase && anxietyPhrase){
-      recentSummaryEl.textContent = `${moodPhrase}で、${anxietyPhrase}`;
-    } else if (moodPhrase){
-      recentSummaryEl.textContent = `${moodPhrase}です。`;
-    } else if (recentMood.length > 0){
-      recentSummaryEl.textContent = '記録が増えると、前の週との比較が表示されます。';
+    // 数字の下に、その数字が何を意味するかを言葉で説明する。ここは
+    // エグゼクティブサマリーより一段ズームインした「この1週間だけ」の
+    // 話に絞り、記録の密度・水準・前週比・振れ幅（最小〜最大）を扱う。
+    recentSummaryEl.innerHTML = '';
+    const lines = [];
+
+    if (recentMood.length === 0){
+      lines.push({ text:'まだ記録がありません。「気分」タブから記録してみましょう。' });
     } else {
-      recentSummaryEl.textContent = 'まだ記録がありません。「気分」タブから記録してみましょう。';
+      // 「直近7日間」は now から 7×24時間で切るため、カレンダー上は8日に
+      // またがることがある。日数は7でクランプして数え間違いに見えないようにする。
+      const daysCovered = Math.min(7, new Set(recent7.map(m => localDateStr(m.ts))).size);
+      let headline = `最近7日間のうち${daysCovered}日に、合わせて${recent7.length}件の記録があります。`;
+      const moodDiff = priorMood.length > 0 ? mean(recentMood) - mean(priorMood) : null;
+      const anxDiff = priorAnxiety.length > 0 && recentAnxiety.length > 0 ? mean(recentAnxiety) - mean(priorAnxiety) : null;
+      const moodWord = moodDiff == null ? null
+        : Math.abs(moodDiff) < 0.3 ? '気分はほぼ横ばい' : (moodDiff > 0 ? '気分は上向き' : '気分はやや下向き');
+      const anxWord = anxDiff == null ? null
+        : Math.abs(anxDiff) < 0.3 ? '不安もほぼ横ばい' : (anxDiff > 0 ? '不安は少し高め' : '不安は少し低め');
+      if (moodWord && anxWord) headline += `${moodWord}で、${anxWord}です。`;
+      else if (moodWord) headline += `${moodWord}です。`;
+      lines.push({ text: headline });
+
+      // 前の7日間との比較を、実際の平均値つきで
+      const compares = [];
+      const roundedMood = Math.max(MOOD_MIN, Math.min(MOOD_MAX, Math.round(mean(recentMood))));
+      if (moodDiff != null){
+        compares.push(`気分は平均${fmt1(mean(recentMood))}（「${MOOD_LABELS[roundedMood]}」に近い状態）で、前の7日間の${fmt1(mean(priorMood))}と比べて${Math.abs(moodDiff) < 0.05 ? '変わっていません' : `${fmt1(Math.abs(moodDiff))}${moodDiff > 0 ? '高め' : '低め'}です`}`);
+      } else {
+        compares.push(`気分は平均${fmt1(mean(recentMood))}（「${MOOD_LABELS[roundedMood]}」に近い状態）です`);
+      }
+      if (recentAnxiety.length > 0){
+        const roundedAnx = Math.max(ANXIETY_MIN, Math.min(ANXIETY_MAX, Math.round(mean(recentAnxiety))));
+        compares.push(anxDiff != null
+          ? `不安は平均${fmt1(mean(recentAnxiety))}（「${ANXIETY_LABELS[roundedAnx]}」に近い状態）で、前の7日間の${fmt1(mean(priorAnxiety))}と比べて${Math.abs(anxDiff) < 0.05 ? '変わっていません' : `${fmt1(Math.abs(anxDiff))}${anxDiff > 0 ? '高め' : '低め'}です`}`
+          : `不安は平均${fmt1(mean(recentAnxiety))}（「${ANXIETY_LABELS[roundedAnx]}」に近い状態）です`);
+      }
+      lines.push({ text: compares.join('。') + '。', sub:true });
+
+      // 振れ幅（最小〜最大）— 平均が同じでも動き方が違うことを見るため
+      if (recentMood.length >= 2){
+        const lo = Math.min(...recentMood), hi = Math.max(...recentMood);
+        let rangeText = lo === hi
+          ? `この7日間の気分はすべて${lo}で、日による差はありません`
+          : `この7日間の気分は${lo}〜${hi}の範囲で動いています`;
+        if (priorMood.length >= 2){
+          const plo = Math.min(...priorMood), phi = Math.max(...priorMood);
+          const width = hi - lo, pwidth = phi - plo;
+          const priorRange = plo === phi ? `すべて${plo}` : `${plo}〜${phi}`;
+          rangeText += width === pwidth
+            ? `。前の7日間（${priorRange}）と振れ幅は同じです`
+            : `。前の7日間（${priorRange}）より振れ幅は${width > pwidth ? '大きく' : '小さく'}なっています`;
+        }
+        lines.push({ text: rangeText + '。', sub:true });
+      }
+
+      if (priorMood.length === 0){
+        lines.push({ text:'前の7日間の記録がまだないため、週ごとの比較は記録が増えてから表示されます。', sub:true });
+      }
     }
+
+    lines.forEach(line => {
+      const p = document.createElement('p');
+      if (line.sub) p.className = 'sub';
+      p.textContent = line.text;
+      recentSummaryEl.appendChild(p);
+    });
   }
 
   /* ---- 3. 最近の傾向: 内部の各分析から重要度上位3件だけを表示 ---- */
@@ -2327,9 +2398,12 @@
     // colored by the same ordinal ramp as everywhere else. Omitted for
     // findings that aren't a same-scale before/after comparison (e.g.
     // variability), which stay text-only.
-    const push = (text, detail, magnitude, scale, n, compare) => {
+    // `why` (optional): 「この差がなぜ経過を見るうえで意味を持つのか」の
+    // 一文。見出しと数字だけでは、読んだ人が何をどう受け取ればよいのか
+    // 分からないため、findingごとに解釈の足場を添える。
+    const push = (text, detail, magnitude, scale, n, compare, why) => {
       if (n < MIN_SAMPLE) return;
-      candidates.push({ text, detail, n, score: Math.abs(magnitude) / scale, compare });
+      candidates.push({ text, detail, n, score: Math.abs(magnitude) / scale, compare, why });
     };
 
     // 時間帯別の不安
@@ -2343,9 +2417,12 @@
         const diff = mean(vals) - mean(others);
         if (Math.abs(diff) >= 0.3){
           push(`${bucket}に不安が${diff > 0 ? '高め' : '低め'}です`,
-            `${bucket}の平均不安 ${mean(vals).toFixed(1)} ／ その他の時間帯 ${mean(others).toFixed(1)}`,
+            `${bucket}の平均不安 ${mean(vals).toFixed(1)}（${vals.length}件） ／ その他の時間帯 ${mean(others).toFixed(1)}（${others.length}件）`,
             diff, ANXIETY_MAX, Math.min(vals.length, others.length),
-            { aLabel: bucket, aValue: mean(vals), bLabel: 'その他', bValue: mean(others), min: ANXIETY_MIN, max: ANXIETY_MAX, colors: ANXIETY_COLORS });
+            { aLabel: bucket, aValue: mean(vals), bLabel: 'その他', bValue: mean(others), min: ANXIETY_MIN, max: ANXIETY_MAX, colors: ANXIETY_COLORS },
+            diff > 0
+              ? `同じ1日の中でも不安の出方に差があることを示しています。強く出やすい時間帯が分かると、その時間帯の予定や過ごし方を振り返る手がかりになります。`
+              : `${bucket}は他の時間帯より不安が落ち着いている時間帯です。調子が安定しやすい時間を把握しておくことも、経過を見るうえでの手がかりになります。`);
         }
       });
     }
@@ -2360,13 +2437,18 @@
         themes.forEach(theme => {
           const themeEntries = tagged.filter(t => t.categories.includes(theme)).map(t => t.entry);
           const themeAnxiety = themeEntries.filter(hasAnxiety).map(e => e.anxiety);
+          // 同じテーマでも書かれ方は一様ではないので、内訳を添えて
+          // 「単語が一致した＝負担」と読まれないようにする。
+          const tone = toneClause(themeToneBreakdown(tagged, theme));
+          const causationNote = `ただし、これは「${theme}」が原因であることを示すものではなく、同じ時期に重なって現れやすい関連です。`;
           if (themeAnxiety.length >= MIN_SAMPLE && overallAnxiety.length >= MIN_SAMPLE){
             const diff = mean(themeAnxiety) - mean(overallAnxiety);
             if (diff >= 0.3){
               push(`「${theme}」に関するメモがある時に不安が高めです`,
-                `平均不安 ${mean(themeAnxiety).toFixed(1)} ／ 全体平均 ${mean(overallAnxiety).toFixed(1)}`,
+                `平均不安 ${mean(themeAnxiety).toFixed(1)}（${themeAnxiety.length}件） ／ 全体平均 ${mean(overallAnxiety).toFixed(1)}（${overallAnxiety.length}件）`,
                 diff, ANXIETY_MAX, themeAnxiety.length,
-                { aLabel: theme, aValue: mean(themeAnxiety), bLabel: '全体', bValue: mean(overallAnxiety), min: ANXIETY_MIN, max: ANXIETY_MAX, colors: ANXIETY_COLORS });
+                { aLabel: theme, aValue: mean(themeAnxiety), bLabel: '全体', bValue: mean(overallAnxiety), min: ANXIETY_MIN, max: ANXIETY_MAX, colors: ANXIETY_COLORS },
+                `${tone ? `「${theme}」に触れたメモの書かれ方の内訳は、${tone}です。` : ''}${causationNote}`);
             }
           }
           const themeMood = themeEntries.map(e => e.level);
@@ -2374,9 +2456,10 @@
             const diff = mean(overallMood) - mean(themeMood);
             if (diff >= 0.3){
               push(`「${theme}」に関するメモがある時に気分が低めです`,
-                `平均気分 ${mean(themeMood).toFixed(1)} ／ 全体平均 ${mean(overallMood).toFixed(1)}`,
+                `平均気分 ${mean(themeMood).toFixed(1)}（${themeMood.length}件） ／ 全体平均 ${mean(overallMood).toFixed(1)}（${overallMood.length}件）`,
                 diff, MOOD_MAX, themeMood.length,
-                { aLabel: theme, aValue: mean(themeMood), bLabel: '全体', bValue: mean(overallMood), min: MOOD_MIN, max: MOOD_MAX, colors: MOOD_COLORS });
+                { aLabel: theme, aValue: mean(themeMood), bLabel: '全体', bValue: mean(overallMood), min: MOOD_MIN, max: MOOD_MAX, colors: MOOD_COLORS },
+                `${tone ? `「${theme}」に触れたメモの書かれ方の内訳は、${tone}です。` : ''}${causationNote}`);
             }
           }
         });
@@ -2392,8 +2475,11 @@
         const diff = recentSd - priorSd;
         if (Math.abs(diff) >= 0.4){
           push(diff > 0 ? '最近は気分の振れ幅が以前より大きくなっています' : '最近は気分の振れ幅が以前より小さくなっています',
-            `直近30日の変動 ${recentSd.toFixed(1)} ／ その前30日 ${priorSd.toFixed(1)}`,
-            diff, 3, Math.min(recentLevels.length, priorLevels.length));
+            `直近30日の変動 ${recentSd.toFixed(1)}（${recentLevels.length}件） ／ その前30日 ${priorSd.toFixed(1)}（${priorLevels.length}件）`,
+            diff, 3, Math.min(recentLevels.length, priorLevels.length), null,
+            diff > 0
+              ? '平均値が同じでも、上下の動きが大きくなること自体が経過を見るうえでの情報になります。日によって差が出やすい時期は、平均だけを見ると変化に気づきにくくなります。'
+              : '記録ごとの差が以前より小さく、日による波が落ち着いてきている状態です。平均値とあわせて、動きの安定も経過の一部として見ていきます。');
         }
       }
     }
@@ -2439,12 +2525,21 @@
   }
 
   function renderFindings(){
-    const top = computeFindings().sort((a,b) => b.score - a.score).slice(0, 3);
+    const all = computeFindings().sort((a,b) => b.score - a.score);
+    const top = all.slice(0, 5);
     findingsListEl.innerHTML = '';
     if (top.length === 0){
-      findingsListEl.innerHTML = '<p class="findings-empty">まだ明確な傾向はありません。記録が増えると、ここに表示されます。</p>';
+      findingsListEl.innerHTML = '<p class="findings-empty">まだ明確な傾向はありません。記録が増えると、記録全体から計算した差のうち大きいものを、根拠の数字と一緒にここへ表示します。</p>';
       return;
     }
+
+    // 並び順の根拠を先に示す。どういう基準で並んでいるか分からないまま
+    // 順位だけ見せられても、読み手は重みづけを判断できないため。
+    const lead = document.createElement('p');
+    lead.className = 'findings-lead';
+    lead.textContent = `記録全体から計算した差のうち、大きいものを上から${top.length}件並べています。「（参考）」は対象が${REFERENCE_SAMPLE}件未満で、まだ確かさが十分でないものです。いずれも関連であって、原因を示すものではありません。`;
+    findingsListEl.appendChild(lead);
+
     top.forEach((f, i) => {
       const item = document.createElement('div');
       item.className = 'finding-item anim-fade-up';
@@ -2465,6 +2560,12 @@
       }
       if (f.compare){
         body.appendChild(buildFindingCompareBars(f.compare));
+      }
+      if (f.why){
+        const why = document.createElement('div');
+        why.className = 'why';
+        why.textContent = f.why;
+        body.appendChild(why);
       }
       item.appendChild(rank);
       item.appendChild(body);
@@ -2551,6 +2652,9 @@
   // 不足" pair without saying what that means.
   function themesPhrase(taggedSubset, count){
     count = count || 2;
+    if (taggedSubset.length === 0){
+      return { ok:false, text:'まだ該当する記録がなく、テーマは集計できません' };
+    }
     if (taggedSubset.length < MIN_SAMPLE){
       const need = MIN_SAMPLE - taggedSubset.length;
       return { ok:false, text:`まだ記録が少なく（あと${need}件ほどで表示されます）、はっきりしたテーマは見えていません` };
@@ -2562,17 +2666,51 @@
   function renderMemoSummary(){
     const tagged = getMemoTaggedEntries();
     if (tagged.length < MIN_SAMPLE){
-      memoSummaryBodyEl.textContent = 'ひとことメモがもう少し増えると、そこから見えてくる傾向をここで説明します。';
+      const need = MIN_SAMPLE - tagged.length;
+      memoSummaryBodyEl.textContent = `ひとことメモは現在${tagged.length}件です。あと${need}件ほど書かれると、どんなテーマが多いか、それが気分・不安とどう重なっているかをここで説明します。`;
       return;
     }
-    const anxious = themesPhrase(tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 4));
-    const good = themesPhrase(tagged.filter(t => t.entry.level >= 4));
     const sentences = [];
-    if (anxious.ok) sentences.push(`不安が強いときのメモには、${anxious.text}。`);
-    if (good.ok) sentences.push(`気分が良いときのメモには、${good.text}。`);
-    memoSummaryBodyEl.innerHTML = sentences.length > 0
-      ? sentences.map(s => `<p class="rec-summary-line">${s}</p>`).join('')
-      : 'まだ、気分や不安とはっきり結びつくテーマは見えていません。';
+
+    // 1. 全体像 — 何件書いて、どのテーマが多いか
+    const sorted = Array.from(countThemes(tagged).entries()).sort((a,b) => b[1]-a[1]);
+    const topText = sorted.slice(0, 3).map(([t,c]) => `「${t}」${c}件`).join('、');
+    sentences.push(`これまでのひとことメモ${tagged.length}件で多いテーマは、${topText}です。`);
+
+    // 2. 上位テーマの書かれ方 — 単語の多さと、その中身は別の話
+    const lead = sorted[0];
+    if (lead && lead[1] >= MIN_SAMPLE){
+      const tone = toneClause(themeToneBreakdown(tagged, lead[0]));
+      if (tone) sentences.push(`いちばん多い「${lead[0]}」の${lead[1]}件を書かれ方で分けると、${tone}でした。`);
+    }
+
+    // 3. 気分・不安との重なり
+    const anxiousSubset = tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 4);
+    const goodSubset = tagged.filter(t => t.entry.level >= 4);
+    const anxious = themesPhrase(anxiousSubset);
+    const good = themesPhrase(goodSubset);
+    if (anxious.ok) sentences.push(`不安が強いとき（不安4〜5）の${anxiousSubset.length}件では、${anxious.text}。`);
+    if (good.ok) sentences.push(`気分が良いとき（気分4〜5）の${goodSubset.length}件では、${good.text}。`);
+
+    // 4. 両方に出てくるテーマがあれば、それは「その言葉＝悪い」ではない
+    if (anxious.ok && good.ok){
+      const overlap = anxious.themes.filter(t => good.themes.includes(t));
+      if (overlap.length > 0){
+        sentences.push(`「${overlap.join('」「')}」は不安が強いときにも気分が良いときにも出てきており、その話題が出ること自体が状態の良し悪しを表すわけではありません。`);
+      }
+    }
+    if (!anxious.ok && !good.ok){
+      sentences.push('気分や不安がはっきり高い・低い記録はまだ少なく、テーマとの重なりは判断できません。');
+    }
+
+    memoSummaryBodyEl.innerHTML = sentences.map(s => `<p class="rec-summary-line">${escapeHtmlText(s)}</p>`).join('');
+  }
+
+  // メモ由来の文字列は利用者が書いた本文そのものを含むため、HTML として
+  // 差し込む箇所では必ずエスケープする（テーマ名は漢字・カタカナ列だけを
+  // 抜き出しているが、将来ルールを変えても安全側に倒れるようにしておく）。
+  function escapeHtmlText(s){
+    return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
   }
 
   /* ---- 0. エグゼクティブサマリー（分析タブ） ----
@@ -2582,7 +2720,7 @@
      は一切行わない。「専門医の診断」とは呼ばず、「専門的な見方」「臨床的な
      観点からの解説」とだけ表現する。
 
-     常に次の4段落構成で書く:
+     常に次の5段落構成で書く:
        1. 現在の状態         — 直近7日間の気分・不安の水準、前の7日間との差、
                                本人の過去30日（データがあれば過去90日も）の
                                平均との差
@@ -2591,7 +2729,10 @@
                                とともに今回のケースに当てはめて説明する
        3. データの背景・文脈 — ひとことメモのテーマ・時間帯との関連を、件数
                                つきの相関として述べる（因果とは言い切らない）
-       4. 今後見るべきポイント — 何を観察していくとよいか（指示ではなく観察点）
+       4. コメントの分析     — テーマ別の件数・気分／不安の平均・書かれ方の
+                               内訳（負担寄りか、良かった寄りか）・最近新しく
+                               出てきた話題までを読み物として説明する
+       5. 今後見るべきポイント — 何を観察していくとよいか（指示ではなく観察点）
 
      数値の裏付けのない文（「いくつかの傾向」「様々な要因」等）は書かない。
      テーマは classifyMemo()/extractMemoKeywords() が返す実際の言葉のみを使い、
@@ -2716,6 +2857,13 @@
   }
 
   function fmt1(v){ return v.toFixed(1); }
+  // 「全体平均3.0より0.9低め」「全体平均3.0とほぼ同じ水準」のように書く。
+  // 差がほぼ無いときに「0.0低め」という無意味な表現を出さないための共通処理。
+  function diffClause(value, base){
+    const d = value - base;
+    if (Math.abs(d) < 0.05) return `${fmt1(base)}とほぼ同じ水準`;
+    return `${fmt1(base)}より${fmt1(Math.abs(d))}${d > 0 ? '高め' : '低め'}`;
+  }
   function clampedLabel(sig){
     return sig.LABELS[Math.max(sig.MIN, Math.min(sig.MAX, Math.round(sig.recentAvg)))];
   }
@@ -2850,16 +2998,96 @@
         const ref = subset.length < REFERENCE_SAMPLE ? '（参考）' : '';
         const themeText = top.map(([t,c]) => `「${t}」（${c}件）`).join('と');
         const shiftWord = todMetricLabel === '不安' ? '不安の高まり' : '気分の落ち込み';
+        const leadTheme = top[0][0];
         sentences.push(`${subsetLabel}${ref}のうち、${themeText}に関する内容が含まれていました。`);
-        sentences.push(`ただし、これは「${top[0][0]}」が原因であることを示すものではありません。現時点では、「${top[0][0]}」に関する内容が記録された時期と、${shiftWord}が重なりやすい、という関連として捉えるのが適切です。`);
+
+        // 単語が一致しただけで「そのテーマ＝負担」と決めつけないよう、
+        // 同じテーマがどんな書かれ方をしていたかまで数えて添える。
+        const tally = themeToneBreakdown(subset, leadTheme);
+        const tone = toneClause(tally);
+        if (tone){
+          sentences.push(`このうち「${leadTheme}」に触れた${tally.total}件を書かれ方で分けると、${tone}でした。`);
+          if (tally.negative > 0 && tally.negative >= tally.positive + tally.neutral){
+            sentences.push(`「${leadTheme}」は単に話題として登場しているだけでなく、負担や不安として書かれている場合が多く、今回の${todMetricLabel}の動きを理解するうえで押さえておきたい文脈です。`);
+          } else if (tally.positive > 0 && tally.negative > 0){
+            sentences.push(`同じ「${leadTheme}」でも負担として書かれた記録と良かったと書かれた記録の両方があり、この言葉が出てくること自体が状態の良し悪しを表すわけではありません。`);
+          }
+        }
+
+        sentences.push(`いずれにせよ、これは「${leadTheme}」が原因であることを示すものではありません。現時点では、「${leadTheme}」に関する内容が記録された時期と、${shiftWord}が重なりやすい、という関連として捉えるのが適切です。原因を確かめるには、同じ場面で毎回そうなるのか、その場面がない時期はどうかを、これから先の記録で見ていく必要があります。`);
       }
     }
 
     if (metricForTod){
       const tod = timeOfDaySignal(metricForTod);
       if (tod){
+        const worseSide = todMetricLabel === '不安' ? tod.diff > 0 : tod.diff < 0;
         sentences.push(`時間帯別に見ると、${tod.label}（${TOD_BUCKET_HOURS[tod.label]}）の記録（${tod.count}件）は平均${todMetricLabel}${fmt1(tod.avg)}で、それ以外の時間帯（${tod.otherCount}件）の平均${fmt1(tod.otherAvg)}より${fmt1(Math.abs(tod.diff))}${tod.diff > 0 ? '高く' : '低く'}なっています。`);
+        sentences.push(worseSide
+          ? `1日の中でも出方に差があり、${tod.label}に${todMetricLabel === '不安' ? '不安が強まりやすい' : '気分が下がりやすい'}時間帯の偏りが見られます。同じ日でも時間帯によって状態が違うことは、経過を見るうえで意味のある情報です。`
+          : `${tod.label}は他の時間帯より${todMetricLabel === '不安' ? '不安が落ち着いている' : '気分が保たれている'}時間帯でした。調子が安定しやすい時間帯を知っておくことも、経過を見るうえでの手がかりになります。`);
       }
+    }
+
+    return sentences.join('');
+  }
+
+  /* ---- 段落4: ひとことメモ（フリーコメント）の分析 ----
+     単語の頻度を並べるのではなく、(1) どのテーマがどれだけ書かれているか、
+     (2) そのテーマのときの気分・不安は全体平均とどう違うか、(3) そのテーマ
+     がどんな書かれ方をしているか、(4) 最近になって新しく出てきた話題は
+     あるか、までを一続きの文章として説明する。件数の裏付けが取れない
+     ものは書かない。 */
+  function execCommentReportParagraph(){
+    const tagged = getMemoTaggedEntries();
+    if (tagged.length < MIN_SAMPLE) return '';
+    const now = Date.now();
+    const sentences = [];
+    const allMood = moods.map(m => m.level);
+    const allAnxiety = moods.filter(hasAnxiety).map(m => m.anxiety);
+
+    const sorted = Array.from(countThemes(tagged).entries()).sort((a,b) => b[1]-a[1]);
+    const topThemes = sorted.slice(0, 3);
+    const spanDays = Math.max(1, Math.round((now - Math.min(...tagged.map(t => t.entry.ts))) / DAY_MS));
+    const themeText = topThemes.map(([t,c]) => `「${t}」（${c}件・メモ全体の${Math.round(c/tagged.length*100)}%）`).join('、');
+    sentences.push(`ひとことメモは、この${spanDays}日間で${tagged.length}件書かれています。よく書かれているテーマは${themeText}でした。`);
+
+    // 上位テーマごとに、気分・不安の平均（全体との差）と書かれ方の内訳
+    let detailed = 0;
+    topThemes.forEach(([theme, count]) => {
+      if (count < MIN_SAMPLE || detailed >= 2) return;
+      detailed++;
+      const entries = tagged.filter(t => t.categories.includes(theme)).map(t => t.entry);
+      const moodVals = entries.map(e => e.level);
+      const anxVals = entries.filter(hasAnxiety).map(e => e.anxiety);
+      const bits = [];
+      if (allMood.length >= MIN_SAMPLE){
+        bits.push(`気分は平均${fmt1(mean(moodVals))}（全体平均${diffClause(mean(moodVals), mean(allMood))}）`);
+      }
+      if (anxVals.length >= MIN_SAMPLE && allAnxiety.length >= MIN_SAMPLE){
+        bits.push(`不安は平均${fmt1(mean(anxVals))}（全体平均${diffClause(mean(anxVals), mean(allAnxiety))}）`);
+      }
+      if (bits.length > 0){
+        sentences.push(`「${theme}」に触れたメモ${count}件では、${bits.join('、')}でした。`);
+      }
+      const tone = toneClause(themeToneBreakdown(tagged, theme));
+      if (tone) sentences.push(`書かれ方の内訳は、${tone}です。`);
+    });
+
+    // 直近2週間に新しく出てきた話題（それ以前には無かったもの）
+    const recentTagged = tagged.filter(t => t.entry.ts >= now - 14*DAY_MS);
+    const earlierTagged = tagged.filter(t => t.entry.ts < now - 14*DAY_MS);
+    if (recentTagged.length >= MIN_SAMPLE && earlierTagged.length >= MIN_SAMPLE){
+      const earlierThemes = new Set(countThemes(earlierTagged).keys());
+      const fresh = Array.from(countThemes(recentTagged).entries())
+        .filter(([t, c]) => c >= 2 && !earlierThemes.has(t))
+        .sort((a,b) => b[1]-a[1])
+        .slice(0, 2);
+      if (fresh.length > 0){
+        sentences.push(`直近2週間のメモ${recentTagged.length}件には、それ以前には出てこなかった${fresh.map(([t,c]) => `「${t}」（${c}件）`).join('と')}が新しく現れています。新しく書かれ始めた話題は、今の状態を理解する手がかりになりやすいため、しばらく注目しておくとよいでしょう。`);
+      }
+    } else if (recentTagged.length > 0 && recentTagged.length < MIN_SAMPLE){
+      sentences.push(`なお、直近2週間のメモは${recentTagged.length}件と少なく、この期間について文章から読み取れることは限られています。`);
     }
 
     return sentences.join('');
@@ -2881,7 +3109,8 @@
           ? '気分は保たれたままであるため、現在の状態は気分の落ち込みというより、不安の高まりが続いている状態として捉える方が、今回の記録には合っています。'
           : '不安は大きく変化していないため、今回の気分の変化は、不安の高まりを伴わない形で起きていると考えられます。';
       }
-      return `今後は、${primary.label}の強さそのものよりも、この状態が数日で戻るのか、さらに持続するのかを中心に見ていくことが重要です。${extra}`;
+      const levelWord = primary.metric === 'anxiety' ? '不安の強さ' : '気分の低さ';
+      return `今後は、${levelWord}そのものよりも、この状態が数日で戻るのか、さらに持続するのかを中心に見ていくことが重要です。${extra}`;
     }
     return `今後は、${primary.label}に今回のような変化がもう数日続くかどうかを見ていくことが重要です。単発の変化なのか、持続する変化なのかで、捉え方が変わってきます。`;
   }
@@ -2926,10 +3155,13 @@
     // 段落3: データの背景・文脈
     const p3 = execContextParagraph(primary, moodSig, anxietySig);
 
-    // 段落4: 今後見るべきポイント
-    const p4 = execWatchParagraph(primary, moodSig, anxietySig);
+    // 段落4: ひとことメモ（フリーコメント）の分析
+    const p4 = execCommentReportParagraph();
 
-    const parts = [p1, p2, p3, p4].filter(Boolean);
+    // 段落5: 今後見るべきポイント
+    const p5 = execWatchParagraph(primary, moodSig, anxietySig);
+
+    const parts = [p1, p2, p3, p4, p5].filter(Boolean);
     if (parts.length === 0) return null;
     return { parts, note: EXEC_SUMMARY_NOTE_ANALYSIS };
   }
@@ -3424,6 +3656,8 @@
     '一番','以前','以後','以外','以上','以下','午前','午後','今回','今度',
     '今後','毎日','毎回','時間','時々','場合','状態','状況','原因','理由',
     '感じ','気持ち','気分','様子','程度','自体','自身','人間','生活','人生',
+    '一日','半日','数日','今週','先週','来週','今月','先月','来月','今年',
+    '一人','一緒','普通','本日','当日','大丈夫','感覚','調子','気','things',
   ]);
 
   // Pulls out likely content words from free Japanese text without a
@@ -3461,6 +3695,54 @@
       categories.forEach(c => counts.set(c, (counts.get(c)||0) + 1));
     });
     return counts;
+  }
+
+  /* ---- メモの書かれ方（トーン）----
+     同じ「仕事」でも、「仕事は順調だった」と「仕事のことを考えると不安で
+     眠れない」では意味がまったく違う。単語の出現回数だけで「仕事のときは
+     不安」と結論づけてしまわないよう、否定寄り／肯定寄りの表現がどれだけ
+     含まれるかを数えて、そのメモがどちら寄りの書き方かだけを判定する。
+     気持ちを推し量るものではなく、書かれた言葉の数え上げに留める。 */
+  const MEMO_TONE_NEGATIVE = [
+    '不安','心配','つらい','辛い','しんどい','苦しい','嫌','憂鬱','ゆううつ','落ち込',
+    'イライラ','いらいら','焦','怖','こわ','疲れ','だるい','痛','眠れな','寝れな',
+    '最悪','失敗','ミス','怒','泣','負担','プレッシャー','無理','できなかった','ストレス',
+    '行きたくな','したくな','億劫','おっくう','後悔','寂し','さびし','重い','荒れ','限界',
+  ];
+  const MEMO_TONE_POSITIVE = [
+    '良かった','よかった','良い','嬉しい','うれしい','楽しい','たのしい','幸せ','しあわせ',
+    '達成','成功','褒め','ほめ','快調','順調','充実','満足','安心','落ち着い','ほっと',
+    'すっきり','スッキリ','元気','笑','感謝','ありがた','できた','進んだ','最高','穏やか',
+  ];
+
+  function memoTone(text){
+    if (!text) return 'neutral';
+    const tally = list => list.reduce((n, kw) => n + (text.includes(kw) ? 1 : 0), 0);
+    const neg = tally(MEMO_TONE_NEGATIVE);
+    const pos = tally(MEMO_TONE_POSITIVE);
+    if (neg > pos) return 'negative';
+    if (pos > neg) return 'positive';
+    return 'neutral'; // 出来事だけの記録、または両方が同じだけ含まれる場合
+  }
+
+  // あるテーマが「どんな書かれ方で」出てくるかの内訳。「『仕事』という
+  // 単語が多い」ではなく「仕事について負担を書いたメモが何件あるか」まで
+  // 言えるようにするための土台。
+  function themeToneBreakdown(taggedSubset, theme){
+    const entries = taggedSubset.filter(t => t.categories.includes(theme));
+    const tally = { total: entries.length, negative: 0, positive: 0, neutral: 0 };
+    entries.forEach(t => { tally[memoTone(t.entry.note)]++; });
+    return tally;
+  }
+
+  // 内訳を日本語の句にする。数えられるものが無ければ空文字を返し、
+  // 中身のない言い回しは作らない。
+  function toneClause(tally){
+    const bits = [];
+    if (tally.negative > 0) bits.push(`負担や不安として書かれたものが${tally.negative}件`);
+    if (tally.positive > 0) bits.push(`良かった・順調として書かれたものが${tally.positive}件`);
+    if (tally.neutral > 0) bits.push(`出来事の記録として書かれたものが${tally.neutral}件`);
+    return bits.join('、');
   }
 
   function memoSectionTitle(text){
@@ -3547,17 +3829,21 @@
       return;
     }
 
+    const now = Date.now();
     const sorted = Array.from(countThemes(tagged).entries()).sort((a,b) => b[1]-a[1]);
     const [topTheme, topCount] = sorted[0];
     const second = sorted[1];
+    const overallMood = moods.map(m => m.level);
+    const overallAnxiety = moods.filter(hasAnxiety).map(m => m.anxiety);
 
-    // 1. overview — what themes come up at all, and how often
-    let overview = `これまでに書いたひとことメモ${tagged.length}件を見ると、もっとも多いテーマは「${topTheme}」（${topCount}件）`;
-    overview += second ? `、次いで「${second[0]}」（${second[1]}件）でした。` : `でした。`;
+    // 1. overview — 何件・どの期間・どのテーマが多いか
+    const spanDays = Math.max(1, Math.round((now - Math.min(...tagged.map(t => t.entry.ts))) / DAY_MS));
+    let overview = `これまでに書いたひとことメモは${spanDays}日間で${tagged.length}件です。もっとも多いテーマは「${topTheme}」（${topCount}件・全体の${Math.round(topCount/tagged.length*100)}%）`;
+    overview += second ? `、次いで「${second[0]}」（${second[1]}件・${Math.round(second[1]/tagged.length*100)}%）でした。` : 'でした。';
     appendNarrative(body, overview);
+    appendNarrative(body, 'テーマは、あらかじめ決めた言葉（仕事・家族・睡眠など）に当てはまるかを見て、当てはまらないメモからは文章中の言葉そのものを取り出しています。そのため、決まった分類に入らない話題も、その言葉のまま集計されます。');
 
-    // 2. per-theme mood/anxiety averages, one sentence per theme —
-    // only for themes with enough entries to average honestly
+    // 2. テーマ別の気分・不安 — 全体平均との差まで書く
     body.appendChild(memoSectionTitle('テーマ別の気分・不安'));
     let anyThemeStat = false;
     sorted.forEach(([theme]) => {
@@ -3565,21 +3851,79 @@
       if (themeEntries.length < MIN_SAMPLE) return;
       anyThemeStat = true;
       const avgMood = mean(themeEntries.map(e => e.level));
+      const moodClause = overallMood.length >= MIN_SAMPLE
+        ? `気分は平均${fmt1(avgMood)}（全体平均${diffClause(avgMood, mean(overallMood))}）`
+        : `気分は平均${fmt1(avgMood)}`;
       const anxietyVals = themeEntries.filter(hasAnxiety).map(e => e.anxiety);
-      const anxietyClause = anxietyVals.length > 0 ? `不安は平均${mean(anxietyVals).toFixed(1)}` : '不安の記録はまだありません';
-      appendNarrative(body, `「${theme}」のメモがあるとき（${themeEntries.length}件）は、気分が平均${avgMood.toFixed(1)}、${anxietyClause}でした。`);
+      let anxietyClause = '不安の記録はまだありません';
+      if (anxietyVals.length > 0){
+        const avgAnx = mean(anxietyVals);
+        anxietyClause = overallAnxiety.length >= MIN_SAMPLE
+          ? `不安は平均${fmt1(avgAnx)}（全体平均${diffClause(avgAnx, mean(overallAnxiety))}）`
+          : `不安は平均${fmt1(avgAnx)}`;
+      }
+      appendNarrative(body, `「${theme}」のメモがあるとき（${themeEntries.length}件）は、${moodClause}、${anxietyClause}でした。`);
     });
-    if (!anyThemeStat) appendNarrative(body, 'まだどのテーマも記録が少なく、テーマごとの気分・不安の違いは判断できません。');
+    if (!anyThemeStat) appendNarrative(body, `どのテーマもまだ${MIN_SAMPLE}件に届いておらず、テーマごとの気分・不安の違いは判断できません。`);
 
-    // 3–5. mood/anxiety extremes — which themes cluster there, in
-    // plain sentences instead of a bare list or "データ不足"
+    // 3. 書かれ方の内訳 — 同じ単語でも中身が違うことを数字で示す
+    body.appendChild(memoSectionTitle('テーマごとの書かれ方'));
+    appendNarrative(body, '同じ「仕事」でも、順調だったという記録と、負担や不安を書いた記録では意味が違います。メモの中の言葉づかいから、どちら寄りの書き方かを数えたものです。気持ちを推測しているわけではなく、書かれた言葉を数えているだけの参考値です。');
+    let anyTone = false;
+    sorted.slice(0, 5).forEach(([theme, count]) => {
+      if (count < MIN_SAMPLE) return;
+      const tone = toneClause(themeToneBreakdown(tagged, theme));
+      if (!tone) return;
+      anyTone = true;
+      const tally = themeToneBreakdown(tagged, theme);
+      let line = `「${theme}」（${count}件）は、${tone}です。`;
+      if (tally.negative > 0 && tally.positive > 0){
+        line += 'どちらの書き方もあるため、この話題が出ること自体が状態の良し悪しを表すわけではありません。';
+      } else if (tally.negative > 0 && tally.negative >= Math.max(1, Math.round(count * 0.6))){
+        line += '負担寄りの書き方が中心のテーマです。';
+      }
+      appendNarrative(body, line);
+    });
+    if (!anyTone) appendNarrative(body, `まだ${MIN_SAMPLE}件以上書かれたテーマがなく、書かれ方の内訳は集計できません。`);
+
+    // 4. 気分・不安の高い／低い記録に、どのテーマが寄っているか
     body.appendChild(memoSectionTitle('気分・不安との関係'));
-    const anxious = themesPhrase(tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 4), 3);
-    appendNarrative(body, `不安が特に強いとき（不安4〜5）のメモは、${anxious.text}。`);
-    const low = themesPhrase(tagged.filter(t => t.entry.level <= 1), 3);
-    appendNarrative(body, `気分が低いとき（気分0〜1）のメモは、${low.text}。`);
-    const good = themesPhrase(tagged.filter(t => t.entry.level >= 4), 3);
-    appendNarrative(body, `気分が良いとき（気分4〜5）のメモは、${good.text}。`);
+    const anxiousSubset = tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 4);
+    const lowSubset = tagged.filter(t => t.entry.level <= 1);
+    const goodSubset = tagged.filter(t => t.entry.level >= 4);
+    const anxious = themesPhrase(anxiousSubset, 3);
+    appendNarrative(body, `不安が特に強いとき（不安4〜5、${anxiousSubset.length}件）のメモは、${anxious.text}。`);
+    const low = themesPhrase(lowSubset, 3);
+    appendNarrative(body, `気分が低いとき（気分0〜1、${lowSubset.length}件）のメモは、${low.text}。`);
+    const good = themesPhrase(goodSubset, 3);
+    appendNarrative(body, `気分が良いとき（気分4〜5、${goodSubset.length}件）のメモは、${good.text}。`);
+    if (anxious.ok && good.ok){
+      const overlap = anxious.themes.filter(t => good.themes.includes(t));
+      if (overlap.length > 0){
+        appendNarrative(body, `なお「${overlap.join('」「')}」は、不安が強い記録にも気分が良い記録にも出てきています。同じ話題でも、そのときの状況によって書かれ方が違うということです。`);
+      }
+    }
+
+    // 5. 最近の話題の移り変わり
+    body.appendChild(memoSectionTitle('最近の話題'));
+    const recentTagged = tagged.filter(t => t.entry.ts >= now - 14*DAY_MS);
+    const earlierTagged = tagged.filter(t => t.entry.ts < now - 14*DAY_MS);
+    if (recentTagged.length === 0){
+      appendNarrative(body, '直近2週間はメモが書かれていないため、最近の話題については比較できません。');
+    } else if (recentTagged.length < MIN_SAMPLE || earlierTagged.length < MIN_SAMPLE){
+      const recentTop = Array.from(countThemes(recentTagged).entries()).sort((a,b) => b[1]-a[1]).slice(0, 3);
+      appendNarrative(body, `直近2週間のメモは${recentTagged.length}件で、${recentTop.map(([t,c]) => `「${t}」${c}件`).join('、')}が書かれています。それ以前と比べるにはまだ件数が足りません。`);
+    } else {
+      const earlierThemes = new Set(countThemes(earlierTagged).keys());
+      const recentCounts = Array.from(countThemes(recentTagged).entries()).sort((a,b) => b[1]-a[1]);
+      appendNarrative(body, `直近2週間のメモ${recentTagged.length}件で多いのは、${recentCounts.slice(0, 3).map(([t,c]) => `「${t}」${c}件`).join('、')}です。`);
+      const fresh = recentCounts.filter(([t, c]) => c >= 2 && !earlierThemes.has(t)).slice(0, 3);
+      if (fresh.length > 0){
+        appendNarrative(body, `このうち${fresh.map(([t,c]) => `「${t}」（${c}件）`).join('と')}は、それ以前のメモには出てこなかった話題です。新しく書かれ始めたことは、今の状態を理解する手がかりになりやすいため、しばらく気に留めておくとよいでしょう。`);
+      } else {
+        appendNarrative(body, '新しく出てきた話題は特にありません。これまでと同じテーマが続いています。');
+      }
+    }
   }
 
   // Moved out of renderMemoAnalysis() (分析タブ) into the 記録タブ側の
