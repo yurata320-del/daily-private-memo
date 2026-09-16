@@ -720,6 +720,77 @@
      paragraph 記録タブ版 (id=recSummaryText, class only) is untouched. */
   #execSummaryText p{ margin:0 0 0.85rem; }
   #execSummaryText p:last-child{ margin-bottom:0; }
+  /* ---- AIが今日気づいたこと: 分析タブの最上部。今日いちばん特徴的な
+     変化だけを短く出すので、本文カードより濃く、面で目立たせる。 ---- */
+  .ai-notice-card{
+    background:linear-gradient(135deg, var(--accent-a), var(--accent-b));
+    color:#ffffff;
+    border-radius:1.5rem;
+    padding:1.1rem 1.15rem;
+    margin-bottom:1rem;
+    box-shadow:var(--glass-shadow);
+  }
+  .ai-notice-card[hidden]{ display:none; }
+  .ai-notice-title{
+    display:flex;
+    align-items:center;
+    gap:0.4rem;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:0.06em;
+    opacity:0.92;
+    margin-bottom:0.5rem;
+  }
+  .ai-notice-title .dot{
+    width:6px; height:6px; border-radius:9999px;
+    background:#ffffff;
+    box-shadow:0 0 0 3px rgba(255,255,255,0.28);
+  }
+  .ai-notice-text{
+    margin:0;
+    font-size:14px;
+    line-height:1.75;
+    font-weight:500;
+  }
+
+  /* ---- 気づきカード: 見出し（ラベル）＋短い本文の反復。総合分析の
+     要点を、拾い読みできる粒度に割ったもの。 ---- */
+  .insight-grid{
+    display:flex;
+    flex-direction:column;
+    gap:0.6rem;
+    margin-bottom:1.5rem;
+  }
+  .insight-item{
+    background:var(--glass);
+    border:1px solid var(--glass-border);
+    box-shadow:var(--glass-shadow);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    border-radius:1.25rem;
+    padding:0.85rem 1rem;
+  }
+  .insight-label{
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:0.05em;
+    color:var(--primary);
+    margin-bottom:0.35rem;
+  }
+  .insight-body{
+    font-size:13.5px;
+    line-height:1.75;
+    color:var(--on-surface);
+  }
+  .insight-list{
+    margin:0;
+    padding-left:1.1rem;
+    font-size:13.5px;
+    line-height:1.75;
+    color:var(--on-surface);
+  }
+  .insight-list li + li{ margin-top:0.3rem; }
+
   .exec-summary-note{
     font-size:11px;
     line-height:1.6;
@@ -1275,12 +1346,21 @@
         <p class="subtitle">最近の自分の状態</p>
       </header>
 
-      <!-- 0. エグゼクティブサマリー — 気分・不安・メモを統合した文章 -->
+      <!-- 0. AIが今日気づいたこと — 最新データでいちばん特徴的な変化 -->
+      <div class="ai-notice-card" id="aiNoticeCard" hidden>
+        <div class="ai-notice-title"><span class="dot"></span>AIが今日気づいたこと</div>
+        <p class="ai-notice-text" id="aiNoticeText"></p>
+      </div>
+
+      <!-- 1. AI総合分析 — 観測から短期予測までを一つの文章として -->
       <div class="exec-summary-card" id="execSummaryCard" hidden>
-        <div class="exec-summary-title">エグゼクティブサマリー</div>
+        <div class="exec-summary-title">AI総合分析</div>
         <div class="exec-summary-text" id="execSummaryText"></div>
         <p class="exec-summary-note" id="execSummaryNote"></p>
       </div>
+
+      <!-- 2. 気づきカード — 今の状態／変化／要因／良い兆候／短期予測／注目点 -->
+      <div class="insight-grid" id="aiInsightGrid"></div>
 
       <!-- 1. 最近7日間 -->
       <div class="recent-card">
@@ -2147,6 +2227,9 @@
   const recentSummaryEl = document.getElementById('recentSummary');
   const recentAsideEl = document.getElementById('recentAside');
   const findingsListEl = document.getElementById('findingsList');
+  const aiNoticeCardEl = document.getElementById('aiNoticeCard');
+  const aiNoticeTextEl = document.getElementById('aiNoticeText');
+  const aiInsightGridEl = document.getElementById('aiInsightGrid');
   const execSummaryCardEl = document.getElementById('execSummaryCard');
   const execSummaryTextEl = document.getElementById('execSummaryText');
   const execSummaryNoteEl = document.getElementById('execSummaryNote');
@@ -2713,148 +2796,9 @@
     return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
   }
 
-  /* ---- 0. エグゼクティブサマリー（分析タブ） ----
-     精神科・心療内科で経過を見る際の考え方（水準だけでなく持続性・本人内での
-     ベースライン比較・変動性・気分と不安の乖離を見る）を参考にした、専門的な
-     解説として構成する。実際の診察ではないため、診断・病名の確定・投薬判断
-     は一切行わない。「専門医の診断」とは呼ばず、「専門的な見方」「臨床的な
-     観点からの解説」とだけ表現する。
-
-     常に次の5段落構成で書く:
-       1. 現在の状態         — 直近7日間の気分・不安の水準、前の7日間との差、
-                               本人の過去30日（データがあれば過去90日も）の
-                               平均との差
-       2. 専門的な解釈       — 経過観察で重視される考え方（持続性・本人内
-                               比較・変動性・気分と不安の乖離）を、実際の数字
-                               とともに今回のケースに当てはめて説明する
-       3. データの背景・文脈 — ひとことメモのテーマ・時間帯との関連を、件数
-                               つきの相関として述べる（因果とは言い切らない）
-       4. コメントの分析     — テーマ別の件数・気分／不安の平均・書かれ方の
-                               内訳（負担寄りか、良かった寄りか）・最近新しく
-                               出てきた話題までを読み物として説明する
-       5. 今後見るべきポイント — 何を観察していくとよいか（指示ではなく観察点）
-
-     数値の裏付けのない文（「いくつかの傾向」「様々な要因」等）は書かない。
-     テーマは classifyMemo()/extractMemoKeywords() が返す実際の言葉のみを使い、
-     「その他」という分類は使わない — 具体的な語に分解できない場合は、その
-     テーマには触れない。 */
-
-  const EXEC_SUMMARY_NOTE_ANALYSIS = 'これは精神科・心療内科で経過を見る際の考え方を参考にした専門的な見方であり、医師による診断ではありません。病名の判断や治療方針の決定はこのアプリでは行えません。気になる変化があれば、この記録を次の診察の参考にしてみてください。';
-
   // 時間帯バケットのラベルに時刻の目安を添えて、文中で「何時台か」が
   // 具体的に伝わるようにする（timeOfDayBucketKey() の区切りと対応）。
   const TOD_BUCKET_HOURS = { '朝':'5〜11時', '昼':'11〜17時', '夕方':'17〜21時', '夜':'21〜5時' };
-
-  // 気分・不安のいずれかの値を日ごとにグルーピングする。
-  function groupValuesByDay(valueFn){
-    const byDay = new Map();
-    moods.forEach(m => {
-      const v = valueFn(m);
-      if (v == null) return;
-      const key = localDateStr(m.ts);
-      if (!byDay.has(key)) byDay.set(key, []);
-      byDay.get(key).push(v);
-    });
-    return byDay;
-  }
-
-  // 最新の記録がある日から遡って、何日連続で条件を満たしているか。単発の
-  // 高値と、数日続いている変化を区別するための「持続性」の判定に使う。
-  function recentStreakDays(valueFn, test){
-    const byDay = groupValuesByDay(valueFn);
-    const days = Array.from(byDay.keys()).sort().reverse();
-    let streak = 0;
-    for (const day of days){
-      if (test(mean(byDay.get(day)))) streak++; else break;
-    }
-    return streak;
-  }
-
-  // 平均との差がもっとも大きい時間帯を、件数つきで返す（「夜に高い傾向」
-  // ではなく「夜（21〜5時）の8件は平均3.1、それ以外の32件は平均2.0」まで
-  // 言えるようにする）。
-  function timeOfDaySignal(valueFn){
-    const buckets = { '朝':[], '昼':[], '夕方':[], '夜':[] };
-    moods.forEach(m => {
-      const v = valueFn(m);
-      if (v == null) return;
-      buckets[timeOfDayBucketKey(new Date(m.ts).getHours())].push(v);
-    });
-    let best = null;
-    Object.keys(buckets).forEach(label => {
-      const vals = buckets[label];
-      if (vals.length < MIN_SAMPLE) return;
-      const others = Object.keys(buckets).filter(l => l !== label).flatMap(l => buckets[l]);
-      if (others.length < MIN_SAMPLE) return;
-      const diff = mean(vals) - mean(others);
-      if (Math.abs(diff) < 0.3) return;
-      if (!best || Math.abs(diff) > Math.abs(best.diff)){
-        best = { label, count: vals.length, avg: mean(vals), otherAvg: mean(others), otherCount: others.length, diff };
-      }
-    });
-    return best;
-  }
-
-  // ある気分/不安の絞り込み（不安が強い記録、など）の中で繰り返し出てくる
-  // テーマ。1件だけの単語が「テーマ」として扱われないよう、2件以上の
-  // ものだけを対象にする。
-  function recurringThemes(subsetTagged, top){
-    return Array.from(countThemes(subsetTagged).entries())
-      .filter(([, c]) => c >= 2)
-      .sort((a,b) => b[1]-a[1])
-      .slice(0, top || 2);
-  }
-
-  // 気分・不安それぞれについて、水準・前週比・本人内ベースライン比・
-  // 変動性・持続性をひとまとめにした「シグナル」を作る。エグゼクティブ
-  // サマリーの4段落は、すべてこのオブジェクト（mood用・anxiety用の2つ）
-  // から組み立てる。
-  function buildMetricSignal(metric, periods){
-    const { recent7, prior7, last30, prior30, last90, have90dExtra, MEANINGFUL, SD_MEANINGFUL } = periods;
-    const isMood = metric === 'mood';
-    const label = isMood ? '気分' : '不安';
-    const LABELS = isMood ? MOOD_LABELS : ANXIETY_LABELS;
-    const MIN = isMood ? MOOD_MIN : ANXIETY_MIN;
-    const MAX = isMood ? MOOD_MAX : ANXIETY_MAX;
-    const valueOf = isMood ? (m => m.level) : (m => hasAnxiety(m) ? m.anxiety : null);
-
-    const recentVals = recent7.map(valueOf).filter(v => v != null);
-    if (recentVals.length < MIN_SAMPLE) return { metric, label, LABELS, MIN, MAX, haveRecent:false };
-
-    const priorVals = prior7.map(valueOf).filter(v => v != null);
-    const base30Vals = last30.map(valueOf).filter(v => v != null);
-    const base90Vals = last90.map(valueOf).filter(v => v != null);
-    const prior30Vals = prior30.map(valueOf).filter(v => v != null);
-
-    const recentAvg = mean(recentVals);
-    const weekDelta = priorVals.length >= MIN_SAMPLE ? recentAvg - mean(priorVals) : null;
-    const base30Delta = base30Vals.length >= MIN_SAMPLE ? recentAvg - mean(base30Vals) : null;
-    const base90Delta = (have90dExtra && base90Vals.length >= MIN_SAMPLE) ? recentAvg - mean(base90Vals) : null;
-    const sdDelta = (base30Vals.length >= MIN_SAMPLE && prior30Vals.length >= MIN_SAMPLE)
-      ? stdev(base30Vals) - stdev(prior30Vals) : null;
-
-    const change = weekDelta != null ? weekDelta : base30Delta;
-    const changed = change != null && Math.abs(change) >= MEANINGFUL;
-    // mood: 値が大きいほど良い。anxiety: 値が大きいほど悪い。
-    const direction = change == null ? null
-      : isMood ? (change > 0 ? 'improve' : 'worsen')
-      : (change > 0 ? 'worsen' : 'improve');
-
-    const worseTest = isMood ? (v => v <= 1) : (v => v >= 3);
-    const streak = (changed && direction === 'worsen') ? recentStreakDays(valueOf, worseTest) : 0;
-    const sdChanged = sdDelta != null && Math.abs(sdDelta) >= SD_MEANINGFUL;
-
-    const score = (changed ? 1 : 0)
-      + (streak >= 3 ? 1.5 : streak === 2 ? 0.6 : 0)
-      + (base30Delta != null && Math.abs(base30Delta) >= MEANINGFUL ? 0.8 : 0)
-      + (sdChanged ? 0.6 : 0);
-
-    return {
-      metric, label, LABELS, MIN, MAX, haveRecent:true, n: recentVals.length,
-      recentAvg, weekDelta, base30Delta, base90Delta, sdDelta,
-      changed, direction, streak, sdChanged, score,
-    };
-  }
 
   function fmt1(v){ return v.toFixed(1); }
   // 「全体平均3.0より0.9低め」「全体平均3.0とほぼ同じ水準」のように書く。
@@ -2864,326 +2808,1053 @@
     if (Math.abs(d) < 0.05) return `${fmt1(base)}とほぼ同じ水準`;
     return `${fmt1(base)}より${fmt1(Math.abs(d))}${d > 0 ? '高め' : '低め'}`;
   }
-  function clampedLabel(sig){
-    return sig.LABELS[Math.max(sig.MIN, Math.min(sig.MAX, Math.round(sig.recentAvg)))];
+
+  /* =====================================================================
+     AI分析エンジン — Part 1: 事前計算
+     文章を作る前に、記録から読み取れる「動き」をすべて数値として出しておく。
+     平均値だけで状態を語らないために、振れ幅・連続性・急変・同日内の上下・
+     戻りの早さ・時間帯／曜日の偏り・気分と不安の連動と時間差までを、ここで
+     まとめて計算する。文章生成側（Part 2）は、ここで出た事実に意味を付ける
+     ことだけを担当する。
+     ===================================================================== */
+
+  const ANALYSIS_STATE_KEY = 'daily-private-memo.analysisState';
+
+  function linearSlopePerDay(series){
+    if (series.length < 3) return null;
+    const t0 = series[0].ts;
+    const xs = series.map(s => (s.ts - t0) / DAY_MS);
+    const ys = series.map(s => s.v);
+    const mx = mean(xs), my = mean(ys);
+    let num = 0, den = 0;
+    xs.forEach((x, i) => { num += (x - mx) * (ys[i] - my); den += (x - mx) * (x - mx); });
+    if (den === 0) return null;
+    return num / den; // 1日あたりの変化量
   }
 
-  // ---- 段落1: 現在の状態 ----
-  function execLevelSentence(recent7, moodSig, anxietySig){
-    const bits = [];
-    if (moodSig.haveRecent) bits.push(`気分は平均${fmt1(moodSig.recentAvg)}（「${clampedLabel(moodSig)}」に近い状態）`);
-    if (anxietySig.haveRecent) bits.push(`不安は平均${fmt1(anxietySig.recentAvg)}（「${clampedLabel(anxietySig)}」に近い状態）`);
-    return `最近7日間の記録（${recent7.length}件）では、${bits.join('、')}です。`;
+  function pearson(a, b){
+    if (a.length < 3 || a.length !== b.length) return null;
+    const ma = mean(a), mb = mean(b);
+    let num = 0, da = 0, db = 0;
+    a.forEach((v, i) => {
+      const x = v - ma, y = b[i] - mb;
+      num += x * y; da += x * x; db += y * y;
+    });
+    if (da === 0 || db === 0) return null;
+    return num / Math.sqrt(da * db);
   }
 
-  function execWeekTrendSentence(moodSig, anxietySig, MEANINGFUL){
-    const have = [moodSig, anxietySig].filter(s => s.haveRecent && s.weekDelta != null);
-    if (have.length === 0) return '';
-    const describe = sig => {
-      const prev = sig.recentAvg - sig.weekDelta;
-      if (Math.abs(sig.weekDelta) < MEANINGFUL){
-        return { text: `${sig.label}は前の7日間の平均${fmt1(prev)}とほぼ変わっていません`, changed:false, worse:false };
-      }
-      const worse = sig.direction === 'worsen';
-      const verb = sig.metric === 'mood' ? (worse ? '下がっています' : '上向いています') : (worse ? '高くなっています' : '下がっています');
-      return { text: `${sig.label}は前の7日間の平均${fmt1(prev)}より${fmt1(Math.abs(sig.weekDelta))}${verb}`, changed:true, worse };
-    };
-    if (have.length === 1) return describe(have[0]).text + '。';
-    const [a, b] = have.map(describe);
-    const connector = (a.changed !== b.changed) || (a.changed && b.changed && a.worse !== b.worse) ? '一方で、' : 'また、';
-    return `${a.text}。${connector}${b.text}。`;
+  // 「悪い状態」に入ってから通常域に戻るまでに、何件・何時間かかったか。
+  // 不安なら高値から、気分なら低値から。戻りが早くなっていれば良い兆候。
+  function recoverySpans(series, isBad, isBack){
+    const spans = [];
+    let i = 0;
+    while (i < series.length){
+      if (!isBad(series[i].v)){ i++; continue; }
+      let j = i + 1;
+      while (j < series.length && !isBack(series[j].v)) j++;
+      if (j >= series.length) break;
+      spans.push({ from: series[i].ts, steps: j - i, hours: (series[j].ts - series[i].ts) / 36e5 });
+      i = j + 1;
+    }
+    return spans;
   }
 
-  function execBaselineSentence(moodSig, anxietySig, MEANINGFUL){
-    const have = [moodSig, anxietySig].filter(s => s.haveRecent && s.base30Delta != null);
-    if (have.length === 0) return '';
-    const describe = sig => {
-      const base = sig.recentAvg - sig.base30Delta;
-      if (Math.abs(sig.base30Delta) < MEANINGFUL){
-        return `${sig.label}は本人の過去30日間の平均${fmt1(base)}とほぼ同じ水準です`;
-      }
-      const higher = sig.base30Delta > 0;
-      const word = higher ? '高め' : '低め';
-      let s = `${sig.label}は本人の過去30日間の平均${fmt1(base)}より${word}です`;
-      if (sig.base90Delta != null && Math.abs(sig.base90Delta) >= MEANINGFUL && (sig.base90Delta > 0) === higher){
-        const base90 = sig.recentAvg - sig.base90Delta;
-        s += `（過去90日間の平均${fmt1(base90)}と比べても同様の傾向です）`;
-      }
-      return s;
-    };
-    return have.map(describe).join('。') + '。';
-  }
-
-  // ---- 段落2: 専門的な解釈 ----
-  function execHeadlineSentence(primary){
-    if (!primary || primary.score === 0){
-      return '今回の記録では、気分・不安ともに大きな変化は見られません。';
-    }
-    if (!primary.changed && primary.sdChanged){
-      return `今回もっとも目立つのは、${primary.label}の振れ幅（変動性）の変化です。`;
-    }
-    const verb = primary.metric === 'mood'
-      ? (primary.direction === 'improve' ? '改善' : '低下')
-      : (primary.direction === 'worsen' ? '上昇' : '軽減');
-    return `今回もっとも目立つのは、${primary.label}の${verb}です。`;
-  }
-
-  function execPersistenceClause(primary){
-    if (!primary || !primary.changed) return '';
-    if (primary.streak >= 3){
-      const verb = primary.metric === 'mood' ? '低い' : '高い';
-      return `今回の記録では、${primary.label}が${primary.streak}日連続で${verb}状態が続いており、一時的な変化というより持続している可能性があります。持続性は、平均値そのものより重視すべき情報です。`;
-    }
-    if (primary.streak === 2){
-      const verb = primary.metric === 'mood' ? '低い' : '高い';
-      return `直近2日間は${primary.label}が${verb}状態が続いています。3日以上続くかどうかは、まだ判断できません。`;
-    }
-    return `現時点では直近の記録${primary.n}件からの判断であり、この変化が数日にわたって続いているかどうかはまだ確認できていません。`;
-  }
-
-  function execVariabilityClause(primary){
-    if (!primary || !primary.sdChanged) return '';
-    const dir = primary.sdDelta > 0 ? '大きく' : '小さく';
-    return `また、${primary.label}の記録ごとの振れ幅（変動性）は直近30日間で以前より${dir}なっています（標準偏差の差 ${fmt1(Math.abs(primary.sdDelta))}）。臨床的な経過観察では、平均値だけでなく、このような変動の大きさも重要な情報として扱われます。`;
-  }
-
-  function execDivergenceClause(moodSig, anxietySig){
-    if (!moodSig.haveRecent || !anxietySig.haveRecent) return '';
-    if (moodSig.changed && !anxietySig.changed){
-      return '気分は変化していますが、不安は大きく変わっていません。気分と不安は必ずしも同じ方向に動くとは限らないため、両者を分けて見ることが重要です。';
-    }
-    if (!moodSig.changed && anxietySig.changed){
-      return '気分そのものは大きく変化していない一方で、不安だけが変化しています。気分と不安は必ずしも同じ方向に動くものではないため、今回のように別々の変化として捉えることが重要です。';
-    }
-    if (moodSig.changed && anxietySig.changed){
-      if (moodSig.direction === 'worsen' && anxietySig.direction === 'worsen'){
-        return '気分の低下と不安の上昇が同時に見られており、2つの変化が重なっている状態です。';
-      }
-      if (moodSig.direction === 'improve' && anxietySig.direction === 'improve'){
-        return '気分の改善と不安の軽減が同時に見られており、良い方向の変化が重なっている状態です。';
-      }
-      const combo = moodSig.direction === 'improve' ? '気分は改善し、不安は上昇しています' : '気分は低下し、不安は軽減しています';
-      return `気分と不安が逆方向に動いており（${combo}）、通常あまり見られない組み合わせです。それぞれ独立した変化として見ていく必要があります。`;
-    }
-    return '';
-  }
-
-  // ---- 段落3: データの背景・文脈 ----
-  function execContextParagraph(primary, moodSig, anxietySig){
-    const tagged = getMemoTaggedEntries();
-    if (tagged.length < MIN_SAMPLE) return '';
-    const sentences = [];
-
-    let subset = null, subsetLabel = '', metricForTod = null, todMetricLabel = '';
-    const wantAnxiety = primary ? primary.metric === 'anxiety' : true;
-    const anx = tagged.filter(t => hasAnxiety(t.entry) && t.entry.anxiety >= 4);
-    const low = tagged.filter(t => t.entry.level <= 1);
-    if (wantAnxiety && anx.length >= MIN_SAMPLE){
-      subset = anx; subsetLabel = `不安が強い記録（不安4〜5、${subset.length}件）`;
-      metricForTod = m => hasAnxiety(m) ? m.anxiety : null; todMetricLabel = '不安';
-    } else if (!wantAnxiety && low.length >= MIN_SAMPLE){
-      subset = low; subsetLabel = `気分が落ち込んでいる記録（気分0〜1、${subset.length}件）`;
-      metricForTod = m => m.level; todMetricLabel = '気分';
-    } else if (anx.length >= MIN_SAMPLE){
-      subset = anx; subsetLabel = `不安が強い記録（不安4〜5、${subset.length}件）`;
-      metricForTod = m => hasAnxiety(m) ? m.anxiety : null; todMetricLabel = '不安';
-    } else if (low.length >= MIN_SAMPLE){
-      subset = low; subsetLabel = `気分が落ち込んでいる記録（気分0〜1、${subset.length}件）`;
-      metricForTod = m => m.level; todMetricLabel = '気分';
-    }
-
-    if (subset){
-      const top = recurringThemes(subset, 2);
-      if (top.length > 0){
-        const ref = subset.length < REFERENCE_SAMPLE ? '（参考）' : '';
-        const themeText = top.map(([t,c]) => `「${t}」（${c}件）`).join('と');
-        const shiftWord = todMetricLabel === '不安' ? '不安の高まり' : '気分の落ち込み';
-        const leadTheme = top[0][0];
-        sentences.push(`${subsetLabel}${ref}のうち、${themeText}に関する内容が含まれていました。`);
-
-        // 単語が一致しただけで「そのテーマ＝負担」と決めつけないよう、
-        // 同じテーマがどんな書かれ方をしていたかまで数えて添える。
-        const tally = themeToneBreakdown(subset, leadTheme);
-        const tone = toneClause(tally);
-        if (tone){
-          sentences.push(`このうち「${leadTheme}」に触れた${tally.total}件を書かれ方で分けると、${tone}でした。`);
-          if (tally.negative > 0 && tally.negative >= tally.positive + tally.neutral){
-            sentences.push(`「${leadTheme}」は単に話題として登場しているだけでなく、負担や不安として書かれている場合が多く、今回の${todMetricLabel}の動きを理解するうえで押さえておきたい文脈です。`);
-          } else if (tally.positive > 0 && tally.negative > 0){
-            sentences.push(`同じ「${leadTheme}」でも負担として書かれた記録と良かったと書かれた記録の両方があり、この言葉が出てくること自体が状態の良し悪しを表すわけではありません。`);
-          }
-        }
-
-        sentences.push(`いずれにせよ、これは「${leadTheme}」が原因であることを示すものではありません。現時点では、「${leadTheme}」に関する内容が記録された時期と、${shiftWord}が重なりやすい、という関連として捉えるのが適切です。原因を確かめるには、同じ場面で毎回そうなるのか、その場面がない時期はどうかを、これから先の記録で見ていく必要があります。`);
-      }
-    }
-
-    if (metricForTod){
-      const tod = timeOfDaySignal(metricForTod);
-      if (tod){
-        const worseSide = todMetricLabel === '不安' ? tod.diff > 0 : tod.diff < 0;
-        sentences.push(`時間帯別に見ると、${tod.label}（${TOD_BUCKET_HOURS[tod.label]}）の記録（${tod.count}件）は平均${todMetricLabel}${fmt1(tod.avg)}で、それ以外の時間帯（${tod.otherCount}件）の平均${fmt1(tod.otherAvg)}より${fmt1(Math.abs(tod.diff))}${tod.diff > 0 ? '高く' : '低く'}なっています。`);
-        sentences.push(worseSide
-          ? `1日の中でも出方に差があり、${tod.label}に${todMetricLabel === '不安' ? '不安が強まりやすい' : '気分が下がりやすい'}時間帯の偏りが見られます。同じ日でも時間帯によって状態が違うことは、経過を見るうえで意味のある情報です。`
-          : `${tod.label}は他の時間帯より${todMetricLabel === '不安' ? '不安が落ち着いている' : '気分が保たれている'}時間帯でした。調子が安定しやすい時間帯を知っておくことも、経過を見るうえでの手がかりになります。`);
-      }
-    }
-
-    return sentences.join('');
-  }
-
-  /* ---- 段落4: ひとことメモ（フリーコメント）の分析 ----
-     単語の頻度を並べるのではなく、(1) どのテーマがどれだけ書かれているか、
-     (2) そのテーマのときの気分・不安は全体平均とどう違うか、(3) そのテーマ
-     がどんな書かれ方をしているか、(4) 最近になって新しく出てきた話題は
-     あるか、までを一続きの文章として説明する。件数の裏付けが取れない
-     ものは書かない。 */
-  function execCommentReportParagraph(){
-    const tagged = getMemoTaggedEntries();
-    if (tagged.length < MIN_SAMPLE) return '';
+  function seriesStats(series, kind){
+    if (series.length === 0) return null;
     const now = Date.now();
-    const sentences = [];
-    const allMood = moods.map(m => m.level);
-    const allAnxiety = moods.filter(hasAnxiety).map(m => m.anxiety);
+    const vals = series.map(s => s.v);
+    const within = (fromDays, toDays) => series
+      .filter(s => s.ts >= now - fromDays*DAY_MS && (toDays == null || s.ts < now - toDays*DAY_MS))
+      .map(s => s.v);
 
-    const sorted = Array.from(countThemes(tagged).entries()).sort((a,b) => b[1]-a[1]);
-    const topThemes = sorted.slice(0, 3);
-    const spanDays = Math.max(1, Math.round((now - Math.min(...tagged.map(t => t.entry.ts))) / DAY_MS));
-    const themeText = topThemes.map(([t,c]) => `「${t}」（${c}件・メモ全体の${Math.round(c/tagged.length*100)}%）`).join('、');
-    sentences.push(`ひとことメモは、この${spanDays}日間で${tagged.length}件書かれています。よく書かれているテーマは${themeText}でした。`);
+    const v7 = within(7), vPrior7 = within(14, 7), v14 = within(14), vPrior14 = within(28, 14), v30 = within(30);
+    const latest = series[series.length - 1];
+    const prev = series.length >= 2 ? series[series.length - 2] : null;
 
-    // 上位テーマごとに、気分・不安の平均（全体との差）と書かれ方の内訳
-    let detailed = 0;
-    topThemes.forEach(([theme, count]) => {
-      if (count < MIN_SAMPLE || detailed >= 2) return;
-      detailed++;
-      const entries = tagged.filter(t => t.categories.includes(theme)).map(t => t.entry);
-      const moodVals = entries.map(e => e.level);
-      const anxVals = entries.filter(hasAnxiety).map(e => e.anxiety);
-      const bits = [];
-      if (allMood.length >= MIN_SAMPLE){
-        bits.push(`気分は平均${fmt1(mean(moodVals))}（全体平均${diffClause(mean(moodVals), mean(allMood))}）`);
-      }
-      if (anxVals.length >= MIN_SAMPLE && allAnxiety.length >= MIN_SAMPLE){
-        bits.push(`不安は平均${fmt1(mean(anxVals))}（全体平均${diffClause(mean(anxVals), mean(allAnxiety))}）`);
-      }
-      if (bits.length > 0){
-        sentences.push(`「${theme}」に触れたメモ${count}件では、${bits.join('、')}でした。`);
-      }
-      const tone = toneClause(themeToneBreakdown(tagged, theme));
-      if (tone) sentences.push(`書かれ方の内訳は、${tone}です。`);
+    // 直近から遡って、何回続けて上がり／下がり続けているか
+    let runUp = 0, runDown = 0;
+    for (let i = series.length - 1; i > 0; i--){
+      const d = series[i].v - series[i-1].v;
+      if (d > 0 && runDown === 0) runUp++;
+      else if (d < 0 && runUp === 0) runDown++;
+      else break;
+    }
+
+    // 記録と記録の間で2段階以上動いたところ（急変）
+    const spikes = [];
+    for (let i = 1; i < series.length; i++){
+      const d = series[i].v - series[i-1].v;
+      if (Math.abs(d) >= 2) spikes.push({ ts: series[i].ts, delta: d, v: series[i].v });
+    }
+
+    // 同じ日の中での上下（1日に2件以上ある日だけ）
+    const byDay = new Map();
+    series.forEach(s => {
+      const k = localDateStr(s.ts);
+      if (!byDay.has(k)) byDay.set(k, []);
+      byDay.get(k).push(s.v);
+    });
+    const dayRanges = Array.from(byDay.entries())
+      .filter(([, arr]) => arr.length >= 2)
+      .map(([day, arr]) => ({ day, range: Math.max(...arr) - Math.min(...arr) }));
+    const recentDayRanges = dayRanges.filter(d => startOfDay(d.day) >= now - 14*DAY_MS).map(d => d.range);
+    const olderDayRanges = dayRanges.filter(d => startOfDay(d.day) < now - 14*DAY_MS).map(d => d.range);
+
+    const byTod = { '朝':[], '昼':[], '夕方':[], '夜':[] };
+    series.forEach(s => byTod[timeOfDayBucketKey(new Date(s.ts).getHours())].push(s.v));
+    const byWeekday = WEEKDAYS_JA.map(() => []);
+    series.forEach(s => byWeekday[new Date(s.ts).getDay()].push(s.v));
+
+    const isAnxiety = kind === 'anxiety';
+    const badTest = isAnxiety ? (v => v >= 4) : (v => v <= 1);
+    const backTest = isAnxiety ? (v => v <= 2) : (v => v >= 3);
+    const spans = recoverySpans(series, badTest, backTest);
+    const halfway = now - 21*DAY_MS;
+    const recentSpans = spans.filter(s => s.from >= halfway).map(s => s.steps);
+    const olderSpans = spans.filter(s => s.from < halfway).map(s => s.steps);
+
+    return {
+      kind, n: series.length, series, latest, prev,
+      deltaFromPrev: prev ? latest.v - prev.v : null,
+      avgAll: mean(vals),
+      avg7: v7.length ? mean(v7) : null, n7: v7.length,
+      avgPrior7: vPrior7.length ? mean(vPrior7) : null, nPrior7: vPrior7.length,
+      avg30: v30.length ? mean(v30) : null, n30: v30.length,
+      max7: v7.length ? Math.max(...v7) : null, min7: v7.length ? Math.min(...v7) : null,
+      max30: v30.length ? Math.max(...v30) : null, min30: v30.length ? Math.min(...v30) : null,
+      sd7: v7.length >= 2 ? stdev(v7) : null,
+      sd14: v14.length >= 2 ? stdev(v14) : null,
+      sdPrior14: vPrior14.length >= 2 ? stdev(vPrior14) : null,
+      runUp, runDown, spikes,
+      recentSpikes: spikes.filter(s => s.ts >= now - 7*DAY_MS),
+      dayRanges,
+      recentDayRange: recentDayRanges.length ? mean(recentDayRanges) : null,
+      olderDayRange: olderDayRanges.length ? mean(olderDayRanges) : null,
+      byTod, byWeekday,
+      slope7: linearSlopePerDay(series.filter(s => s.ts >= now - 7*DAY_MS)),
+      last5: series.slice(-5).map(s => s.v),
+      recoverySteps: spans.map(s => s.steps),
+      recentRecovery: recentSpans.length ? mean(recentSpans) : null,
+      olderRecovery: olderSpans.length ? mean(olderSpans) : null,
+    };
+  }
+
+  // 気分と不安の関係。相関そのものではなく、「どちらが先に動くか」まで見る。
+  function pairStats(){
+    const both = moods.filter(hasAnxiety).slice().sort((a,b) => a.ts - b.ts);
+    const out = { n: both.length, r: null, leadAnxiety: null, leadMood: null, lead: null, decoupled: 0, coupled: 0 };
+    if (both.length < 4) return out;
+    out.r = pearson(both.map(e => e.level), both.map(e => e.anxiety));
+
+    const dm = [], da = [];
+    for (let i = 1; i < both.length; i++){
+      dm.push(both[i].level - both[i-1].level);
+      da.push(both[i].anxiety - both[i-1].anxiety);
+    }
+    // 同時に動いた回数／片方だけ動いた回数
+    dm.forEach((d, i) => {
+      const movedM = Math.abs(d) >= 1, movedA = Math.abs(da[i]) >= 1;
+      if (movedM && movedA) out.coupled++;
+      else if (movedM !== movedA) out.decoupled++;
+    });
+    if (dm.length >= 5){
+      // 「不安の変化」の次に「気分の変化」が来るか／その逆か
+      out.leadAnxiety = pearson(da.slice(0, -1), dm.slice(1));
+      out.leadMood = pearson(dm.slice(0, -1), da.slice(1));
+      const a = out.leadAnxiety == null ? 0 : Math.abs(out.leadAnxiety);
+      const m = out.leadMood == null ? 0 : Math.abs(out.leadMood);
+      if (Math.max(a, m) >= 0.35 && Math.abs(a - m) >= 0.15) out.lead = a > m ? 'anxiety' : 'mood';
+    }
+    return out;
+  }
+
+  // 気分×不安の組み合わせから、今の状態の「型」を読む（診断ではない）。
+  // 閾値は本人の平均を基準にして、その人にとって高い／低いで判断する。
+  function quadrantState(moodV, anxV, moodBase, anxBase){
+    if (moodV == null) return null;
+    const mHigh = moodV >= (moodBase != null ? Math.max(moodBase + 0.4, 3) : 3.5);
+    const mLow  = moodV <= (moodBase != null ? Math.min(moodBase - 0.4, 2.5) : 2);
+    if (anxV == null){
+      if (mHigh) return { key:'mood-high', label:'落ち着いて過ごせている状態', reading:'今回のデータでは、気分は本人の普段の水準より高めで、落ち着いて過ごせている状態に近いと考えられます。' };
+      if (mLow)  return { key:'mood-low',  label:'気分が下がっている状態', reading:'今回のデータでは、気分が本人の普段の水準より低く、活力が落ちている状態に近い可能性があります。' };
+      return { key:'mood-mid', label:'普段どおりの状態', reading:'今回のデータでは、気分は本人の普段の範囲に収まっています。' };
+    }
+    const aHigh = anxV >= (anxBase != null ? Math.max(anxBase + 0.4, 2.5) : 3);
+    const aLow  = anxV <= (anxBase != null ? Math.min(anxBase - 0.4, 2) : 1.5);
+    if (mHigh && aLow)  return { key:'good',      label:'安定して調子が良い状態', reading:'気分が保たれていて不安も低く、今回のデータでは安定して調子の良い状態に近いと考えられます。' };
+    if (mHigh && aHigh) return { key:'tense',     label:'気分は保てているが緊張がある状態', reading:'気分そのものは保たれている一方で不安は高く、今回のデータでは、気分の落ち込みというより緊張や心配が前に出ている状態に近い可能性があります。' };
+    if (mLow && aHigh)  return { key:'loaded',    label:'負荷が強く出ている状態', reading:'気分が低く不安も高い組み合わせで、今回のデータでは心理的な負荷が強く出ている状態に近い可能性があります。' };
+    if (mLow && aLow)   return { key:'flat',      label:'不安は低いが活力が落ちている状態', reading:'不安は低いのに気分が上がらない組み合わせで、今回のデータでは、心配事というより疲労や活力の低下が関係している可能性も考えられます。' };
+    if (aHigh)          return { key:'anx-only',  label:'不安が前に出ている状態', reading:'気分は普段の範囲にありますが不安が高く、今回のデータでは不安だけが目立っている状態に近いと考えられます。' };
+    if (mLow)           return { key:'mood-only', label:'気分が下がっている状態', reading:'不安は普段の範囲にある一方で気分が低く、今回のデータでは気分の低下が単独で起きている可能性があります。' };
+    return { key:'neutral', label:'普段の範囲', reading:'気分・不安ともに本人の普段の範囲に収まっています。' };
+  }
+
+  // 直近の記録が、その人のいつもの中でどのあたりか
+  function positionInRecent(stat){
+    if (!stat || !stat.latest) return null;
+    const v = stat.latest.v;
+    const last5 = stat.last5;
+    const ranked = last5.slice().sort((a,b) => a-b);
+    const isTop = last5.length >= 3 && v >= ranked[ranked.length-1] && ranked[0] !== ranked[ranked.length-1];
+    const isBottom = last5.length >= 3 && v <= ranked[0] && ranked[0] !== ranked[ranked.length-1];
+    const base = stat.avg30 != null ? stat.avg30 : stat.avgAll;
+    const vsBase = base != null ? v - base : null;
+    return { v, isTop, isBottom, vsBase, base, n: last5.length };
+  }
+
+  function buildAnalysisStats(){
+    const sortedMoods = moods.slice().sort((a,b) => a.ts - b.ts);
+    const moodSeries = sortedMoods.map(m => ({ ts:m.ts, v:m.level, note:m.note, entry:m }));
+    const anxSeries = sortedMoods.filter(hasAnxiety).map(m => ({ ts:m.ts, v:m.anxiety, note:m.note, entry:m }));
+    return {
+      now: Date.now(),
+      total: moods.length,
+      mood: seriesStats(moodSeries, 'mood'),
+      anxiety: seriesStats(anxSeries, 'anxiety'),
+      pair: pairStats(),
+      comments: commentInsights(),
+    };
+  }
+
+  /* =====================================================================
+     AI分析エンジン — Part 2: コメントの意味を読む
+     「仕事 3件」のような単語の数え上げでは、同じ『仕事』でも「終わらせた」
+     のか「指摘された」のかが分からない。ここでは話題（classifyMemo）とは
+     別に、そのメモに書かれている“状況の種類”を取り出し、状況ごとに気分・
+     不安がどう動いていたかを見る。
+     control は「自分で動かせる度合い」。完了・休息は自分で運べる状況、
+     指摘・予定外・トラブルは自分では止めにくい状況。両者を分けて集計すると、
+     「仕事そのもの」ではなく「コントロールしにくい状況」と不安が結びついて
+     いるのかどうかを確かめられる。
+     ===================================================================== */
+
+  const MEMO_SITUATIONS = [
+    { key:'達成・完了',     control:'high', words:['終わっ','終わら','終えた','完了','できた','出来た','提出','達成','片付','間に合','クリア','解決','進んだ','やり切','乗り切','捗っ'] },
+    { key:'評価された',     control:'high', words:['褒め','ほめ','評価され','認められ','ありがとう','感謝され','喜んで','助かった'] },
+    { key:'休息・回復',     control:'high', words:['休ん','休憩','ゆっくり','よく寝','よく眠','リラックス','のんびり','昼寝','休みだ','休めた','ぼーっと'] },
+    { key:'交流・楽しみ',   control:'high', words:['会っ','出かけ','遊ん','食事','ご飯','旅行','ライブ','映画','楽しか','笑っ','話せた','飲み'] },
+    { key:'多忙・負荷',     control:'mid',  words:['忙し','残業','余裕がな','手一杯','詰ま','締め切り','締切','納期','量が多','終わらな','追われ','立て込'] },
+    { key:'指摘・叱責',     control:'low',  words:['指摘','注意され','怒られ','叱ら','クレーム','文句','責め','ダメ出し','否定され','言われた'] },
+    { key:'予定外・トラブル', control:'low', words:['トラブル','急に','急な','予定外','割り込','想定外','障害','エラー','ミス','失敗','やり直','対応に追わ','キャンセル'] },
+    { key:'対人摩擦',       control:'low',  words:['喧嘩','ケンカ','気まずい','当たりが','合わない','距離を','無視','すれ違','冷たく'] },
+    { key:'体調不良',       control:'low',  words:['頭痛','熱が','だるい','吐き気','腹痛','痛い','風邪','体調が','生理','めまい'] },
+    { key:'眠れない',       control:'low',  words:['眠れ','寝れ','寝付け','不眠','寝不足','目が覚め','浅い'] },
+    { key:'先の心配',       control:'low',  words:['心配','考えると','どうなる','大丈夫か','気がかり','プレッシャー','怖い','先が','この先'] },
+  ];
+
+  function extractSituations(text){
+    if (!text) return [];
+    return MEMO_SITUATIONS
+      .filter(s => s.words.some(w => text.includes(w)))
+      .map(s => ({ key: s.key, control: s.control }));
+  }
+
+  // 状況ごとに、そのとき記録されていた気分・不安がどうだったか。
+  // 件数が1件でも捨てずに返し、確度は呼び出し側で言葉に反映する。
+  function commentInsights(){
+    const withNote = moods.filter(m => m.note && m.note.trim().length > 0);
+    const overallMood = moods.map(m => m.level);
+    const overallAnx = moods.filter(hasAnxiety).map(m => m.anxiety);
+    const baseMood = overallMood.length ? mean(overallMood) : null;
+    const baseAnx = overallAnx.length ? mean(overallAnx) : null;
+
+    const bySituation = new Map();
+    withNote.forEach(m => {
+      extractSituations(m.note).forEach(s => {
+        if (!bySituation.has(s.key)) bySituation.set(s.key, { key:s.key, control:s.control, entries:[] });
+        bySituation.get(s.key).entries.push(m);
+      });
     });
 
-    // 直近2週間に新しく出てきた話題（それ以前には無かったもの）
-    const recentTagged = tagged.filter(t => t.entry.ts >= now - 14*DAY_MS);
-    const earlierTagged = tagged.filter(t => t.entry.ts < now - 14*DAY_MS);
-    if (recentTagged.length >= MIN_SAMPLE && earlierTagged.length >= MIN_SAMPLE){
-      const earlierThemes = new Set(countThemes(earlierTagged).keys());
-      const fresh = Array.from(countThemes(recentTagged).entries())
-        .filter(([t, c]) => c >= 2 && !earlierThemes.has(t))
-        .sort((a,b) => b[1]-a[1])
-        .slice(0, 2);
-      if (fresh.length > 0){
-        sentences.push(`直近2週間のメモ${recentTagged.length}件には、それ以前には出てこなかった${fresh.map(([t,c]) => `「${t}」（${c}件）`).join('と')}が新しく現れています。新しく書かれ始めた話題は、今の状態を理解する手がかりになりやすいため、しばらく注目しておくとよいでしょう。`);
+    const situations = Array.from(bySituation.values()).map(g => {
+      const moodVals = g.entries.map(e => e.level);
+      const anxVals = g.entries.filter(hasAnxiety).map(e => e.anxiety);
+      return {
+        key: g.key, control: g.control, n: g.entries.length, entries: g.entries,
+        avgMood: moodVals.length ? mean(moodVals) : null,
+        avgAnx: anxVals.length ? mean(anxVals) : null,
+        moodDelta: (moodVals.length && baseMood != null) ? mean(moodVals) - baseMood : null,
+        anxDelta: (anxVals.length && baseAnx != null) ? mean(anxVals) - baseAnx : null,
+        latestTs: Math.max(...g.entries.map(e => e.ts)),
+      };
+    }).sort((a,b) => b.n - a.n);
+
+    // コントロールしにくい状況 vs 自分で運べる状況
+    const group = control => {
+      const entries = [];
+      situations.filter(s => s.control === control).forEach(s => entries.push(...s.entries));
+      const uniq = Array.from(new Map(entries.map(e => [e.ts, e])).values());
+      const anxVals = uniq.filter(hasAnxiety).map(e => e.anxiety);
+      const moodVals = uniq.map(e => e.level);
+      return {
+        n: uniq.length,
+        avgAnx: anxVals.length ? mean(anxVals) : null,
+        avgMood: moodVals.length ? mean(moodVals) : null,
+      };
+    };
+    const lowControl = group('low');
+    const highControl = group('high');
+
+    // 同じ話題の中で、状況によって結果が割れているか
+    // （例：仕事でも「完了」のときは気分が高く、「指摘」のときは不安が高い）
+    const splitByTheme = [];
+    const tagged = getMemoTaggedEntries();
+    Array.from(countThemes(tagged).entries())
+      .filter(([, c]) => c >= 3)
+      .forEach(([theme]) => {
+        const themeEntries = tagged.filter(t => t.categories.includes(theme)).map(t => t.entry);
+        const good = [], bad = [];
+        themeEntries.forEach(e => {
+          const sits = extractSituations(e.note);
+          if (sits.some(s => s.control === 'high')) good.push(e);
+          if (sits.some(s => s.control === 'low')) bad.push(e);
+        });
+        if (good.length >= 1 && bad.length >= 1){
+          const goodAnx = good.filter(hasAnxiety).map(e => e.anxiety);
+          const badAnx = bad.filter(hasAnxiety).map(e => e.anxiety);
+          splitByTheme.push({
+            theme,
+            good: { n: good.length, avgMood: mean(good.map(e => e.level)), avgAnx: goodAnx.length ? mean(goodAnx) : null },
+            bad:  { n: bad.length,  avgMood: mean(bad.map(e => e.level)),  avgAnx: badAnx.length ? mean(badAnx) : null },
+          });
+        }
+      });
+
+    // 直近の大きな変化と、その前後に書かれたメモの一致（n=1でも仮説として使う）
+    const coincidences = [];
+    const anxSorted = moods.filter(hasAnxiety).slice().sort((a,b) => a.ts - b.ts);
+    for (let i = 1; i < anxSorted.length; i++){
+      const jump = anxSorted[i].anxiety - anxSorted[i-1].anxiety;
+      if (jump < 2) continue;
+      const near = withNote.find(m => Math.abs(m.ts - anxSorted[i].ts) <= 6*36e5);
+      if (near){
+        const sits = extractSituations(near.note);
+        coincidences.push({ ts: anxSorted[i].ts, jump, note: near.note, situations: sits.map(s => s.key) });
       }
-    } else if (recentTagged.length > 0 && recentTagged.length < MIN_SAMPLE){
-      sentences.push(`なお、直近2週間のメモは${recentTagged.length}件と少なく、この期間について文章から読み取れることは限られています。`);
     }
 
-    return sentences.join('');
+    return {
+      noteCount: withNote.length,
+      situations, lowControl, highControl, splitByTheme,
+      coincidences: coincidences.slice(-3).reverse(),
+      baseMood, baseAnx,
+    };
   }
 
-  // ---- 段落4: 今後見るべきポイント ----
-  function execWatchParagraph(primary, moodSig, anxietySig){
-    if (!primary || primary.score === 0){
-      return '現時点では、特定の変化を強く意識するよりも、現在の状態が維持されるかどうかを継続して記録し、見ていくのがよい状態です。';
+  /* =====================================================================
+     AI分析エンジン — Part 3: 意味付け・仮説・短期予測
+     Part 1/2 が出した事実に意味を付ける。方針は4つ。
+       ・数値そのものを結論にしない（「平均3.6です」で終わらせない）
+       ・平均が同じでも、振れ幅・連続性・急変・戻りの早さで状態を語り分ける
+       ・確度を言葉で区別する（はっきり／可能性／まだ弱い手がかり）
+       ・断定しない。診断しない。未来も断定しない。
+     ===================================================================== */
+
+  const AI_ANALYSIS_NOTE = 'この分析は記録から読み取れる見立てであり、診断ではありません。示しているのは関連であって原因ではなく、今後の予測も「今のパターンが続いた場合」の見込みです。気になる変化があれば、この記録を次の診察の参考にしてみてください。';
+
+  function labelOf(kind, v){
+    const t = kind === 'anxiety' ? ANXIETY_LABELS : MOOD_LABELS;
+    const min = kind === 'anxiety' ? ANXIETY_MIN : MOOD_MIN;
+    const max = kind === 'anxiety' ? ANXIETY_MAX : MOOD_MAX;
+    return t[Math.max(min, Math.min(max, Math.round(v)))];
+  }
+
+  function agoText(ts){
+    const diff = Date.now() - ts;
+    const h = Math.floor(diff / 36e5);
+    if (h < 1) return 'ついさっき';
+    if (h < 24) return `${h}時間前`;
+    const d = Math.floor(diff / DAY_MS);
+    return `${d}日前`;
+  }
+
+  // 確度を日本語に変換する。件数と効果の大きさから、言い切りの強さを変える。
+  function confidenceWord(n, strength){
+    if (n >= REFERENCE_SAMPLE && strength >= 0.6) return 'likely';
+    if (n >= MIN_SAMPLE && strength >= 0.35) return 'possible';
+    return 'weak';
+  }
+  function hedgeTail(conf){
+    if (conf === 'likely') return 'という動きが比較的はっきり見られます';
+    if (conf === 'possible') return '可能性があります';
+    return 'かもしれません（まだ手がかりは弱く、今後の記録で確かめたいところです）';
+  }
+
+  /* ---- 段落1: 現在の全体状態 ---- */
+  function aiParaCurrent(S){
+    const s = [];
+    const m = S.mood, a = S.anxiety;
+    if (!m) return s;
+    const q = quadrantState(m.latest.v, a ? a.latest.v : null, m.avg30 != null ? m.avg30 : m.avgAll, a ? (a.avg30 != null ? a.avg30 : a.avgAll) : null);
+
+    const bits = [`気分${m.latest.v}（「${labelOf('mood', m.latest.v)}」）`];
+    if (a && a.latest && Math.abs(a.latest.ts - m.latest.ts) < 1000) bits.push(`不安${a.latest.v}（「${labelOf('anxiety', a.latest.v)}」）`);
+    s.push(`いちばん新しい記録は${agoText(m.latest.ts)}の${bits.join('・')}です。`);
+    if (q) s.push(q.reading);
+
+    const pos = positionInRecent(m);
+    const aPos = a ? positionInRecent(a) : null;
+    if (pos && pos.n >= 3){
+      if (pos.isTop) s.push('気分は直近5回の中でもっとも高く、ここしばらくでは良いほうの記録です。');
+      else if (pos.isBottom) s.push('気分は直近5回の中でもっとも低く、ここしばらくでは負担がかかっているほうの記録です。');
+      else if (pos.vsBase != null && Math.abs(pos.vsBase) < 0.5) s.push('気分は本人のいつもの水準に近く、突出した記録ではありません。');
     }
-    if (!primary.changed && primary.sdChanged){
-      return `今後は、平均値そのものよりも、${primary.label}の記録ごとの振れ幅が今の大きさのまま続くのか、それとも落ち着いていくのかを見ていくとよいでしょう。`;
+    if (aPos && aPos.n >= 3 && aPos.isTop) s.push('一方で不安は直近5回の中でもっとも高く、今の負荷は気分より不安の側に出ています。');
+    else if (aPos && aPos.n >= 3 && aPos.isBottom) s.push('不安は直近5回の中でもっとも低く、心配事の側は落ち着いています。');
+
+    if (m.deltaFromPrev != null && Math.abs(m.deltaFromPrev) >= 1){
+      s.push(`前回の記録からは気分が${Math.abs(m.deltaFromPrev)}段階${m.deltaFromPrev > 0 ? '上がって' : '下がって'}おり、直前との比較でも動きが出ています。`);
     }
-    if (primary.changed && primary.streak >= 2){
-      const other = primary.metric === 'mood' ? anxietySig : moodSig;
+    return s;
+  }
+
+  /* ---- 段落2: 最近の変化・特徴（平均だけで判断しない） ---- */
+  function aiParaChange(S){
+    const s = [];
+    const m = S.mood, a = S.anxiety;
+    if (!m) return s;
+
+    // 平均は同じでも動きが違う、を最優先で言う
+    const flatAvg = m.avg7 != null && m.avg30 != null && Math.abs(m.avg7 - m.avg30) < 0.3;
+    const range7 = (m.max7 != null && m.min7 != null) ? m.max7 - m.min7 : null;
+    if (flatAvg && range7 != null && range7 >= 2){
+      // 直近の1件がその幅のどこにあるかまで言わないと、「平均は同じ」が
+      // 今まさに起きている動きを打ち消してしまう。
+      const edge = m.latest.v <= m.min7 ? '下端' : (m.latest.v >= m.max7 ? '上端' : null);
+      const edgeText = edge === '下端'
+        ? `そして直近の1件は、その幅の下端にあたります。平均が動いていないのは、この1週間の中に良い記録も混じっているためで、今の時点だけを見れば低いほうに振れています。`
+        : edge === '上端'
+        ? `そして直近の1件は、その幅の上端にあたります。平均としては普段どおりでも、今の時点は良いほうに振れています。`
+        : '';
+      s.push(`平均値だけを見ると、この1週間の気分は普段とほとんど変わりません。ただし個々の記録は一定ではなく、${m.min7}から${m.max7}までの幅で動いています。つまり今の特徴は「全体が悪化している」ことではなく、「普段の水準を保ちながら、そのつど揺れている」ことにあります。${edgeText}`);
+    } else if (m.avg7 != null && m.avg30 != null && Math.abs(m.avg7 - m.avg30) >= 0.3){
+      const up = m.avg7 > m.avg30;
+      s.push(`この1週間の気分は、過去30日の落ち着きどころと比べて${up ? '高いほう' : '低いほう'}に寄っています。単発のぶれではなく、ここ1週間全体が${up ? '上向きの側' : '重いほうの側'}に移ってきている状態です。`);
+    }
+
+    // 同じ日の中での上下
+    if (m.recentDayRange != null && m.recentDayRange >= 1.5){
+      s.push(`1日に複数回つけた記録を見ると、同じ日の中でも平均して${fmt1(m.recentDayRange)}段階ほど気分が動いています。日をまたぐ変化だけでなく、1日の中での上下が大きいのが最近の特徴です。`);
+    } else if (m.recentDayRange != null && m.olderDayRange != null && m.olderDayRange - m.recentDayRange >= 0.7){
+      s.push('同じ日の中での気分の上下は、以前より小さくなっています。1日の中で振り回される場面が減ってきている状態です。');
+    }
+
+    // 連続
+    if (m.runUp >= 2) s.push(`気分は直近${m.runUp + 1}回の記録で続けて上がっており、短期的には回復方向の動きが出ています。`);
+    if (m.runDown >= 2) s.push(`気分は直近${m.runDown + 1}回の記録で続けて下がっており、単発の落ち込みではなく流れとして下向きになっています。`);
+    if (a && a.runUp >= 2) s.push(`不安は直近${a.runUp + 1}回の記録で続けて上がっています。1回だけ高い値が出たのとは意味が違い、積み上がっている形です。`);
+    if (a && a.runDown >= 2) s.push(`不安は直近${a.runDown + 1}回の記録で続けて下がっており、高まっていた緊張がほどけてきています。`);
+
+    // 急変
+    const spike = (a && a.recentSpikes.length ? a.recentSpikes[a.recentSpikes.length-1] : null) ||
+                  (m.recentSpikes.length ? m.recentSpikes[m.recentSpikes.length-1] : null);
+    if (spike){
+      const isAnx = a && a.recentSpikes.includes(spike);
+      s.push(`この1週間には、1回の記録で${Math.abs(spike.delta)}段階動いた急な変化（${localDateStr(spike.ts).slice(5).replace('-','/')}の${isAnx ? '不安' : '気分'}）もありました。ゆるやかな変化とは別に、短時間で切り替わる場面があるということです。`);
+    }
+
+    // 変動性の変化
+    if (m.sd14 != null && m.sdPrior14 != null && Math.abs(m.sd14 - m.sdPrior14) >= 0.4){
+      const bigger = m.sd14 > m.sdPrior14;
+      s.push(`記録ごとのばらつきは、2週間前までと比べて${bigger ? '大きく' : '小さく'}なっています。${bigger ? '同じ平均でも状態が揺れやすい時期に入っているため、平均より「振れ幅」を見るほうが今の状態を掴みやすい局面です。' : '状態が一定に近づいてきており、日ごとの振り回されは減っています。'}`);
+    }
+
+    // 時間帯・曜日
+    const tod = strongestBucket(m.byTod, 'mood') || (a ? strongestBucket(a.byTod, 'anxiety') : null);
+    if (tod) s.push(tod.sentence);
+    const wd = strongestWeekday(a ? a.byWeekday : m.byWeekday, a ? 'anxiety' : 'mood');
+    if (wd) s.push(wd.sentence);
+
+    return s;
+  }
+
+  function strongestBucket(byTod, kind){
+    const keys = Object.keys(byTod).filter(k => byTod[k].length >= 3);
+    if (keys.length < 2) return null;
+    let best = null;
+    keys.forEach(k => {
+      const others = [];
+      Object.keys(byTod).forEach(k2 => { if (k2 !== k) others.push(...byTod[k2]); });
+      if (others.length < 3) return;
+      const diff = mean(byTod[k]) - mean(others);
+      if (Math.abs(diff) < 0.5) return;
+      if (!best || Math.abs(diff) > Math.abs(best.diff)) best = { k, diff, n: byTod[k].length };
+    });
+    if (!best) return null;
+    const worse = kind === 'anxiety' ? best.diff > 0 : best.diff < 0;
+    return { ...best, sentence: `時間帯で見ると、${best.k}（${TOD_BUCKET_HOURS[best.k]}）の記録${best.n}件は他の時間帯と比べて${kind === 'anxiety' ? '不安' : '気分'}が${best.diff > 0 ? '高め' : '低め'}です。${worse ? `一日のうち${best.k}が負担のかかりやすい時間になっている可能性があります。` : `${best.k}は比較的持ちこたえやすい時間帯のようです。`}` };
+  }
+
+  function strongestWeekday(byWeekday, kind){
+    const idx = byWeekday.map((arr, i) => ({ i, arr })).filter(x => x.arr.length >= 3);
+    if (idx.length < 3) return null;
+    let best = null;
+    idx.forEach(x => {
+      const others = [];
+      byWeekday.forEach((arr, i) => { if (i !== x.i) others.push(...arr); });
+      if (others.length < 5) return;
+      const diff = mean(x.arr) - mean(others);
+      if (Math.abs(diff) < 0.6) return;
+      if (!best || Math.abs(diff) > Math.abs(best.diff)) best = { i: x.i, diff, n: x.arr.length };
+    });
+    if (!best) return null;
+    const worse = kind === 'anxiety' ? best.diff > 0 : best.diff < 0;
+    return { ...best, sentence: `曜日では${WEEKDAYS_JA[best.i]}曜日の記録${best.n}件が他の曜日より${kind === 'anxiety' ? '不安' : '気分'}が${best.diff > 0 ? '高め' : '低め'}で、${worse ? '週の中で決まったタイミングに負担が寄っている可能性があります。' : '週の中で回復しやすいタイミングになっているようです。'}` };
+  }
+
+  /* ---- 段落3: 気分と不安の関係 ---- */
+  function aiParaPair(S){
+    const s = [];
+    const p = S.pair, m = S.mood, a = S.anxiety;
+    if (!a || !m) return s;
+
+    // 連動の話と非連動の話が同じ段落で矛盾しないよう、先にどちらの筋で
+    // 語るかを決める。相関係数だけでなく「実際に何回一緒に動いたか」を見る。
+    const total = p.coupled + p.decoupled;
+    const decoupledDominant = total >= 4 && p.decoupled / total >= 0.6;
+    const coupledDominant = total >= 4 && p.coupled / total >= 0.6;
+    const conf = p.r != null ? confidenceWord(p.n, Math.abs(p.r)) : 'weak';
+
+    if (decoupledDominant){
+      s.push(`記録と記録のあいだでは、気分と不安のどちらか片方だけが動いたことのほう（${p.decoupled}回）が、両方同時に動いたとき（${p.coupled}回）より多くなっています。今の状態は、気分と不安をひとまとめにせず、別々に見たほうが実態に合っています。`);
+      if (p.r != null && p.r <= -0.35){
+        s.push('ただし記録全体をならすと、不安が高い回ほど気分もやや低いという弱いつながりはあり、まったく無関係というわけではなさそうです。');
+      }
+    } else if (coupledDominant || (p.r != null && Math.abs(p.r) >= 0.35)){
+      if (p.r != null && p.r <= -0.35){
+        s.push(`これまでの記録では、不安が高いタイミングほど気分が低くなる${hedgeTail(conf)}。2つがセットで動きやすいため、不安が上がった時点で気分にも影響が出やすい関係にあります。`);
+      } else {
+        s.push(`状態が変わるときは、気分と不安が一緒に動くことが多くなっています（同時に動いたのが${p.coupled}回）。どちらか一方だけを見るより、2つをまとめて状態の指標として見るほうが分かりやすい関係です。`);
+      }
+    } else if (p.r != null){
+      s.push('気分と不安は、記録全体で見るとはっきりした連動を示していません。片方が動いてももう片方は動かないことが多く、それぞれ別の要因で動いている可能性があります。');
+    }
+
+    if (p.lead === 'anxiety'){
+      s.push('動く順番を見ると、先に不安が変化し、そのあとで気分が動くパターンが目立ちます。不安のスコアが、状態が変わる前のサインになっている可能性があります。');
+    } else if (p.lead === 'mood'){
+      s.push('動く順番を見ると、先に気分が下がり、あとから不安が高まるパターンが目立ちます。気分の落ち込みが続くと、そのあと不安が乗ってくる形です。');
+    }
+
+    // 「不安が高くても気分は保てている」回数
+    const both = moods.filter(hasAnxiety);
+    const held = both.filter(e => e.anxiety >= 4 && e.level >= 3).length;
+    const highAnx = both.filter(e => e.anxiety >= 4).length;
+    if (highAnx >= 3 && held / highAnx >= 0.4){
+      s.push(`不安が強かった${highAnx}件のうち${held}件では、気分は普通以上を保てています。不安が高いこと自体が、そのまま気分の落ち込みに直結しているわけではないようです。`);
+    }
+    return s;
+  }
+
+  /* ---- 段落4: コメント・出来事との関連 ---- */
+  function aiParaContext(S){
+    const s = [];
+    const C = S.comments;
+    const m = S.mood, a = S.anxiety;
+
+    // コメントが無くても分析する（記録時刻・曜日・同日内の動き・組み合わせ）
+    if (!C || C.noteCount === 0){
+      s.push('この期間はひとことメモが書かれていないため、ここからは数値の動き方だけで見ていきます。');
+      if (m){
+        const sameDay = m.dayRanges.filter(d => startOfDay(d.day) >= Date.now() - 7*DAY_MS);
+        if (sameDay.length > 0 && mean(sameDay.map(d => d.range)) >= 1){
+          s.push('直近1週間は、同じ日の中でも気分が動いています。丸一日を通して一定というより、日中に状態が切り替わる場面があるということです。');
+        }
+      }
+      const tod = a ? strongestBucket(a.byTod, 'anxiety') : (m ? strongestBucket(m.byTod, 'mood') : null);
+      if (tod) s.push(tod.sentence);
+      const wd = a ? strongestWeekday(a.byWeekday, 'anxiety') : (m ? strongestWeekday(m.byWeekday, 'mood') : null);
+      if (wd) s.push(wd.sentence);
+
+      // 記録がどの時間帯に偏っているか自体も、見えている範囲の話として意味がある
+      if (m && m.n >= MIN_SAMPLE){
+        const counts = Object.keys(m.byTod).map(k => ({ k, n: m.byTod[k].length })).sort((a2,b2) => b2.n - a2.n);
+        if (counts[0].n / m.n >= 0.7){
+          s.push(`記録の${Math.round(counts[0].n / m.n * 100)}%が${counts[0].k}（${TOD_BUCKET_HOURS[counts[0].k]}）に集中しているため、それ以外の時間帯の状態はまだ見えていません。違う時間帯の記録が増えると、一日の中のどこで状態が変わるのかまで追えるようになります。`);
+        }
+      }
+      s.push('あわせてひとことメモを一言だけでも添えると、この動きが何と重なっているのかまで見られるようになります。');
+      return s;
+    }
+
+    // 状況ごとの違い（単語の数ではなく、何が起きたか）
+    const notable = C.situations
+      .filter(x => x.n >= 2 && ((x.anxDelta != null && Math.abs(x.anxDelta) >= 0.5) || (x.moodDelta != null && Math.abs(x.moodDelta) >= 0.5)))
+      .slice(0, 2);
+    notable.forEach(x => {
+      const parts = [];
+      if (x.anxDelta != null && Math.abs(x.anxDelta) >= 0.5) parts.push(`不安がいつもより${x.anxDelta > 0 ? '高く' : '低く'}`);
+      if (x.moodDelta != null && Math.abs(x.moodDelta) >= 0.5) parts.push(`気分がいつもより${x.moodDelta > 0 ? '高く' : '低く'}`);
+      s.push(`メモに「${x.key}」にあたる出来事が書かれていた${x.n}件では、${parts.join('、')}出ています。`);
+    });
+
+    // 同じ話題でも、状況によって結果が割れている
+    const split = C.splitByTheme.find(x => x.good.n >= 1 && x.bad.n >= 1 &&
+      ((x.bad.avgAnx != null && x.good.avgAnx != null && x.bad.avgAnx - x.good.avgAnx >= 0.7) ||
+       (x.good.avgMood - x.bad.avgMood >= 0.7)));
+    if (split){
+      s.push(`同じ「${split.theme}」の記録でも、中身によって結果が分かれています。自分で進められた場面（${split.good.n}件）では気分が平均${fmt1(split.good.avgMood)}なのに対し、指摘・予定外など自分では止めにくい場面（${split.bad.n}件）では気分が平均${fmt1(split.bad.avgMood)}でした。「${split.theme}」そのものというより、その中で自分がどれだけ状況を動かせたかが効いている可能性があります。`);
+    } else if (C.lowControl.n >= 3 && C.highControl.n >= 3 && C.lowControl.avgAnx != null && C.highControl.avgAnx != null &&
+               C.lowControl.avgAnx - C.highControl.avgAnx >= 0.6){
+      s.push(`メモを「自分で運べた出来事」と「自分では止めにくい出来事」に分けると、後者${C.lowControl.n}件のほうが不安が平均${fmt1(C.lowControl.avgAnx - C.highControl.avgAnx)}高く出ています。出来事の種類そのものより、コントロールしにくさが不安と結びついている可能性があります。`);
+    }
+
+    // 1件しかない一致も、仮説としては使う
+    if (s.length <= 1 && C.coincidences.length > 0){
+      const c = C.coincidences[0];
+      const what = c.situations.length ? `「${c.situations[0]}」にあたる内容` : '同じ時間帯のメモ';
+      s.push(`まだ${C.coincidences.length}件のみなので傾向とは言えませんが、不安が急に上がったタイミングと、${what}が書かれた時刻が一致しています。同じ状況でまた同じ変化が起きるかを見ていくと、関連がはっきりしてきます。`);
+    }
+
+    if (s.length === 0){
+      s.push(`ひとことメモは${C.noteCount}件ありますが、今のところ特定の出来事と数値の動きがはっきり重なるところまでは見えていません。出来事の書き方（何があったか）を一言添えていくと、この対応関係が見えやすくなります。`);
+    }
+    return s;
+  }
+
+  /* ---- 段落5: 仮説・良い兆候・短期予測 ---- */
+  function aiGoodSigns(S){
+    const out = [];
+    const m = S.mood, a = S.anxiety;
+    if (a && a.recentRecovery != null && a.olderRecovery != null && a.olderRecovery - a.recentRecovery >= 0.5){
+      out.push('不安が上がる場面はありますが、以前より次の記録で元の水準へ戻るまでが短くなっています。不安そのものが減ったというより、長く引きずりにくくなってきている可能性があります。');
+    }
+    if (m && m.recentRecovery != null && m.olderRecovery != null && m.olderRecovery - m.recentRecovery >= 0.5){
+      out.push('気分が落ちた後に元の水準へ戻るまでの回数が、以前より少なくなっています。落ち込み自体はあっても、戻る力は保たれているようです。');
+    }
+    if (m && m.sd14 != null && m.sdPrior14 != null && m.sdPrior14 - m.sd14 >= 0.4){
+      out.push('気分の振れ幅は2週間前までと比べて小さくなっており、状態が安定する方向に向かっています。');
+    }
+    if (m && m.runUp >= 2) out.push(`気分は${m.runUp + 1}回続けて上がっており、短期的には良い流れが続いています。`);
+    if (a && a.runDown >= 2) out.push(`不安は${a.runDown + 1}回続けて下がっており、緊張がほどけてきています。`);
+    const both = moods.filter(hasAnxiety);
+    const held = both.filter(e => e.anxiety >= 4 && e.level >= 3).length;
+    if (held >= 2) out.push(`不安が強いときでも気分を普通以上に保てた記録が${held}件あり、不安に引きずられきらずに踏みとどまれている場面があります。`);
+    return out;
+  }
+
+  function aiForecast(S){
+    const m = S.mood, a = S.anxiety, p = S.pair;
+    if (!m) return null;
+    const moodVol = m.sd7 != null ? m.sd7 : (m.sd14 != null ? m.sd14 : null);
+    const anxVol = a && a.sd7 != null ? a.sd7 : (a && a.sd14 != null ? a.sd14 : null);
+
+    // 直前に大きく動いた直後は、その戻り方が最大の関心事になる。
+    const moodJump = m.deltaFromPrev != null && Math.abs(m.deltaFromPrev) >= 2 ? m.deltaFromPrev : null;
+    const anxJump = a && a.deltaFromPrev != null && Math.abs(a.deltaFromPrev) >= 2 ? a.deltaFromPrev : null;
+    if (moodJump != null || anxJump != null){
+      // 悪化方向に動いた直後か、持ち直した直後かで、見るべきものが変わる
+      const worsened = (moodJump != null && moodJump < 0) || (anxJump != null && anxJump > 0);
+      const steps = a && a.recoverySteps.length ? Math.round(mean(a.recoverySteps)) : (m.recoverySteps.length ? Math.round(mean(m.recoverySteps)) : null);
+      if (worsened){
+        const back = steps
+          ? `これまでの記録では、こうした急な変化のあと平均${steps}回ほどの記録で元の水準に戻っています。今回も同じくらいで戻るかどうかが、一時的な変化か続く変化かの目安になります。`
+          : '次の数回の記録で、一時的な変化か続く変化かがはっきりしてきます。';
+        return `直近で大きく動いた直後のため、今後24時間から数日は、この変化が戻るかどうかが焦点になります。${back}`;
+      }
+      return '直近で大きく持ち直した直後です。今後24時間から数日は、この水準が保たれるのか、それとももう一度下がるのかが焦点になります。持ち直した直後は揺り戻しも起きやすいため、1回下がっただけで判断せず、数回分の流れで見るのが無難です。';
+    }
+
+    if (a && a.runUp >= 2){
+      return '現在のパターンが続く場合、今後24時間から数日は不安が高めのまま推移し、下がるとしても一段ずつになりそうです。急に落ち着くというより、少しずつ戻る経過になる可能性があります。';
+    }
+    if (m.runDown >= 2){
+      return '現在のパターンが続く場合、ここ数日は気分が低めで推移する可能性があります。これまでの記録では落ち込みが何日も続きっぱなしにはなっていないため、数日のうちに戻りはじめるかどうかが一つの目安になります。';
+    }
+    if (m.runUp >= 2 || (a && a.runDown >= 2)){
+      return '今の流れが続けば、ここ数日は今の水準を保つか、もう少し落ち着く方向に進みそうです。ただし回復の途中は揺り戻しも起きやすいため、一度下がっても、それが続くかどうかで判断するのが無難です。';
+    }
+    if (anxVol != null && moodVol != null && anxVol - moodVol >= 0.4){
+      return '直近の推移では気分は比較的安定している一方、不安のほうが細かく上下しています。そのため短期的には、大きな気分低下よりも、不安が一時的に上下する状態が続く可能性があります。';
+    }
+    if (moodVol != null && anxVol != null && moodVol - anxVol >= 0.4){
+      return '直近では不安より気分のほうが動きやすくなっています。今後24時間から数日も、不安が急に高まるというより、気分が上下しやすい状態が続きそうです。';
+    }
+    if (moodVol != null && moodVol < 0.6){
+      return '直近の記録は動きが小さく、現在のパターンが続く場合、ここ数日は大きな変動なく推移しそうです。むしろ、今の安定がどこまで続くかを見ていく局面です。';
+    }
+    return '今のところ一方向への流れは出ていないため、短期的には上下どちらにも動きうる状態です。次の数回の記録で向きがはっきりしてくる可能性があります。';
+  }
+
+  function aiHypothesis(S){
+    const C = S.comments, p = S.pair, m = S.mood, a = S.anxiety;
+    // 直近に大きな変化があり、その時刻にメモが重なっているなら、
+    // まずそれを（1例であることを明示したうえで）仮説として置く。
+    if (C && C.coincidences.length > 0 && C.coincidences[0].ts >= S.now - 3*DAY_MS){
+      const c = C.coincidences[0];
+      const what = c.situations.length ? `「${c.situations[0]}」として書かれた出来事` : '同じ時刻に書かれたメモの内容';
+      return `現時点でもっとも素直な見方は、直近の不安の高まりが、${what}と重なって起きたというものです。ただしこれは今のところ1例であり、同じ状況で再び同じ動きが出るかどうかで、関連かどうかが分かれます。`;
+    }
+    if (C && C.splitByTheme.length > 0){
+      const x = C.splitByTheme[0];
+      return `現時点でもっとも考えられるのは、「${x.theme}」に関わること全般ではなく、その中で自分では動かしにくい場面が負荷になっている、という見方です。`;
+    }
+    if (C && C.lowControl.n >= 3 && C.highControl.n >= 3 && C.lowControl.avgAnx != null && C.highControl.avgAnx != null &&
+        C.lowControl.avgAnx - C.highControl.avgAnx >= 0.6){
+      return '現時点でもっとも考えられるのは、出来事の内容そのものより、その状況を自分で動かせたかどうかが不安の出方を左右している、という見方です。同じ場面でも、自分で進められたときと、指摘や予定外の対応で受け身になったときとで、記録の出方が違っています。';
+    }
+    if (p && p.lead === 'anxiety'){
+      return '現時点での見立てとしては、状態が変わるときにまず不安が動き、気分はその後についてくる、という順番になっている可能性があります。';
+    }
+    if (a && a.runUp >= 2 && m && Math.abs(m.avg7 - (m.avg30 != null ? m.avg30 : m.avg7)) < 0.3){
+      return '現時点では、気分の土台は保たれたまま不安だけが積み上がっている状態、という見方がもっともデータに合っています。';
+    }
+    if (m && m.avg7 != null && m.avg30 != null && Math.abs(m.avg7 - m.avg30) < 0.3 && m.sd7 != null && m.sd7 >= 1){
+      return '現時点では「全体として悪化している」というより、「普段の水準は保ちつつ、揺れが大きくなっている」という見方がデータに合っています。';
+    }
+    if (m && m.runDown >= 2){
+      return '現時点では、単発の落ち込みではなく、数回にわたって下向きの流れが続いている状態と考えられます。';
+    }
+    return '現時点では特定の要因に絞り込めるだけの材料はありませんが、記録が続くほど、どの状況で状態が動くのかは見えやすくなります。';
+  }
+
+  function aiWatchPoints(S){
+    const out = [];
+    const m = S.mood, a = S.anxiety, p = S.pair, C = S.comments;
+    if (p && p.lead === 'anxiety') out.push('不安のスコアが先に動くかどうか（状態が変わる前のサインになりえます）');
+    if (a && a.runUp >= 2) out.push('不安の高い状態が、あと何日続くか（数日で戻るか、さらに続くか）');
+    if (m && m.runDown >= 2) out.push('気分の下向きの流れが止まる記録が、いつ出るか');
+    if (m && m.sd14 != null && m.sdPrior14 != null && m.sd14 - m.sdPrior14 >= 0.4) out.push('平均値よりも、1日の中での上下の大きさ');
+    if (C && C.lowControl.n >= 2) out.push('自分では止めにくい出来事が続いたとき、不安がどう動くか');
+    if (m && m.recentDayRange != null && m.recentDayRange >= 1.5) out.push('同じ日の中で、どの時間帯に切り替わっているか');
+    if (out.length === 0){
+      out.push('今の落ち着いた状態が、来週も同じように続くか');
+      out.push('記録の少ない時間帯（起床直後や就寝前）にも記録が増えると、見える範囲が広がります');
+    }
+    return out.slice(0, 3);
+  }
+
+  function aiParaOutlook(S){
+    const s = [];
+    s.push(aiHypothesis(S));
+    const good = aiGoodSigns(S);
+    if (good.length > 0) s.push(good[0]);
+    const f = aiForecast(S);
+    if (f) s.push(f);
+    const w = aiWatchPoints(S);
+    if (w.length > 0) s.push(`当面は、${w[0]}を中心に見ていくと、状態の変化に気づきやすくなります。`);
+    return s;
+  }
+
+  /* =====================================================================
+     AI分析エンジン — Part 4: 組み立て・前回との差分・表示
+     ・段落を組み立て、500文字に満たなければ「まだ使っていない別の事実」を
+       足す（同じ内容の言い換えでは埋めない）
+     ・前回表示した分析の要点を保存しておき、新しい記録が入ったときだけ
+       「前回から何が変わったか」を計算する
+     ===================================================================== */
+
+  function loadAnalysisState(){
+    try { return JSON.parse(localStorage.getItem(ANALYSIS_STATE_KEY)) || null; }
+    catch (e){ return null; }
+  }
+  function saveAnalysisState(o){
+    try { localStorage.setItem(ANALYSIS_STATE_KEY, JSON.stringify(o)); } catch (e){}
+  }
+
+  function analysisSignature(S){
+    const m = S.mood, a = S.anxiety;
+    const q = m ? quadrantState(m.latest.v, a ? a.latest.v : null,
+      m.avg30 != null ? m.avg30 : m.avgAll,
+      a ? (a.avg30 != null ? a.avg30 : a.avgAll) : null) : null;
+    const round = v => v == null ? null : Math.round(v * 10) / 10;
+    return {
+      latestTs: m ? m.latest.ts : 0,
+      latestMood: m ? m.latest.v : null,
+      latestAnx: a ? a.latest.v : null,
+      avg7mood: round(m ? m.avg7 : null),
+      avg7anx: round(a ? a.avg7 : null),
+      moodRun: m ? (m.runUp > 0 ? m.runUp : -m.runDown) : 0,
+      anxRun: a ? (a.runUp > 0 ? a.runUp : -a.runDown) : 0,
+      lead: S.pair.lead,
+      coupledRatio: (S.pair.coupled + S.pair.decoupled) > 0
+        ? Math.round(S.pair.coupled / (S.pair.coupled + S.pair.decoupled) * 10) / 10 : null,
+      quadrant: q ? q.key : null,
+      quadrantLabel: q ? q.label : null,
+      sd14: round(m ? m.sd14 : null),
+    };
+  }
+
+  // 新しい記録が入ったときだけ呼ばれる。「今回初めて分かったこと」を探す。
+  function detectChanges(prev, cur, S){
+    const out = [];
+    if (prev.quadrant && cur.quadrant && prev.quadrant !== cur.quadrant && cur.quadrantLabel){
+      out.push(`今回の記録で、状態の見え方が「${prev.quadrantLabel}」から「${cur.quadrantLabel}」に変わりました。`);
+    }
+    if (prev.moodRun < 0 && cur.moodRun > 0){
+      out.push('続いていた気分の低下が、今回の記録で反転しています。下げ止まりの可能性があります。');
+    }
+    if (prev.moodRun > 0 && cur.moodRun < 0){
+      out.push('続いていた気分の回復が、今回の記録でいったん途切れました。');
+    }
+    if (cur.anxRun >= 2 && prev.anxRun < 2){
+      out.push('今回から、不安が続けて上がる動きに変わりました。単発の高値とは意味が違います。');
+    }
+    if (prev.anxRun >= 2 && cur.anxRun < 2){
+      out.push('続いていた不安の上昇が、今回の記録で止まりました。');
+    }
+    if (prev.lead !== cur.lead && cur.lead === 'anxiety'){
+      out.push('これまでは気分と不安がまとまって動いていましたが、最近は不安のほうが先に動くパターンが見えてきました。');
+    }
+    if (prev.coupledRatio != null && cur.coupledRatio != null && prev.coupledRatio - cur.coupledRatio >= 0.2){
+      out.push('前回までは気分と不安が同時に動くことが多かったのですが、最近は片方だけが動くケースが増えています。');
+    }
+    if (cur.latestAnx != null && prev.latestAnx != null && cur.latestAnx - prev.latestAnx >= 2){
+      out.push('前回の記録から不安が大きく上がっています。短い時間での切り替わりです。');
+    }
+    if (cur.latestMood != null && prev.latestMood != null && prev.latestMood - cur.latestMood >= 2){
+      out.push('前回の記録から気分が大きく下がっています。何があったかを一言メモに残しておくと、後から見返す手がかりになります。');
+    }
+    if (prev.avg7mood != null && cur.avg7mood != null && Math.abs(cur.avg7mood - prev.avg7mood) >= 0.3){
+      out.push(`この1週間の気分の重心が、前回見たときより${cur.avg7mood > prev.avg7mood ? '軽いほう' : '重いほう'}に移っています。`);
+    }
+    if (prev.sd14 != null && cur.sd14 != null && cur.sd14 - prev.sd14 >= 0.3){
+      out.push('記録ごとの振れ幅が、前回見たときより大きくなっています。平均より揺れのほうに変化が出ています。');
+    }
+    return out;
+  }
+
+  // 「AIが今日気づいたこと」= 1〜3文。変化があればそれを優先し、
+  // 無ければ今もっとも特徴的な動きを1つ選ぶ（数値の読み上げにはしない）。
+  function buildNotice(S, changes){
+    const lines = [];
+    if (changes && changes.length > 0){
+      lines.push(changes[0]);
+      if (changes[1]) lines.push(changes[1]);
+    }
+    if (lines.length === 0){
+      const m = S.mood, a = S.anxiety;
+      const quietMood = m && m.sd7 != null && m.sd7 < 0.6 && m.recentSpikes.length === 0;
+      const quietAnx = !a || (a.sd7 != null && a.sd7 < 0.6 && a.recentSpikes.length === 0);
+      if (a && a.runUp >= 2) lines.push(`不安が${a.runUp + 1}回続けて上がっています。1回だけ高い日があるのとは違い、積み上がっている形です。`);
+      else if (m && m.runUp >= 2) lines.push(`気分が${m.runUp + 1}回続けて上がっています。今は回復の流れが出ているタイミングです。`);
+      else if (m && m.runDown >= 2) lines.push(`気分が${m.runDown + 1}回続けて下がっています。単発ではなく流れとして下向きです。`);
+      else if (a && a.recentSpikes.length > 0) lines.push('この1週間に、不安が一気に切り替わった記録があります。ゆるやかな変化とは別の動き方です。');
+      else if (m && m.recentDayRange != null && m.recentDayRange >= 1.5) lines.push('同じ日の中での気分の上下が大きくなっています。日単位の平均より、一日の中の動きに状態が出ています。');
+      else if (S.pair.lead === 'anxiety') lines.push('最近は、状態が変わるときに気分より先に不安が動いています。不安のスコアが早めのサインになっている可能性があります。');
+      else if (quietMood && quietAnx) lines.push('ここ数日は記録の動きが小さく、状態が一定に保たれています。');
+      else lines.push('今回は大きな方向転換は出ていません。次の数回の記録で、どちらに動くかが見えてきそうです。');
+    }
+    // 2文目は、総合分析の末尾（短期予測）と同じ文にならないよう、
+    // 変化・要因・良い兆候の順で別の角度を選ぶ。
+    if (lines.length === 1){
+      const second = [aiChangeHighlight(S), aiFactorHighlight(S), (aiGoodSigns(S)[0] || null)]
+        .filter(Boolean)
+        .find(t => t.slice(0, 12) !== lines[0].slice(0, 12));
+      if (second) lines.push(second);
+    }
+    return lines.slice(0, 3).join('');
+  }
+
+  // 500文字に届かないときに足す「まだ書いていない別の事実」。
+  // 同じ内容の言い換えでは水増ししない。
+  function aiReserveObservations(S, used){
+    const r = [];
+    const m = S.mood, a = S.anxiety;
+    const push = (para, marker, text) => { if (text && used.indexOf(marker) === -1) r.push({ para, text }); };
+
+    if (m && m.n30 >= 3){
+      const days = new Set(m.series.filter(s => s.ts >= S.now - 30*DAY_MS).map(s => localDateStr(s.ts))).size;
+      push(1, '記録のペース', `過去30日では${days}日に${m.n30}件を記録しています。記録の間隔が空くほど、そのあいだの動きは見えなくなるため、このペースが保たれているかどうかも状態の一部として見ています。`);
+    }
+    if (m && m.max30 != null && m.min30 != null && m.max30 > m.min30){
+      push(2, 'この30日の気分は', `この30日の気分は${m.min30}から${m.max30}までのあいだで動いており、これがいまの本人の振れ幅です。ここから外れる記録が出たときは、いつもと違う何かが起きているサインとして見られます。`);
+    }
+    if (a && a.n >= MIN_SAMPLE){
+      const high = a.series.filter(s => s.v >= 4).length;
+      const low = a.series.filter(s => s.v <= 1).length;
+      if (high + low > 0) push(3, '不安が強く出た記録は', `不安が強く出た記録は全${a.n}件中${high}件、ほとんど不安のない記録は${low}件です。強い不安が常時ではなく、波として現れていることが分かります。`);
+    }
+    if (S.comments && S.comments.situations.length > 0){
+      const top = S.comments.situations[0];
+      push(4, `「${top.key}」`, `メモに書かれた出来事では「${top.key}」が${top.n}件ともっとも多く、この人の記録の背景として繰り返し出てくる場面です。`);
+    }
+    const w = aiWatchPoints(S);
+    if (w.length > 1) push(5, w[1], `あわせて、${w[1]}も見ておくと変化に気づきやすくなります。`);
+    return r;
+  }
+
+  function composeAiAnalysis(S, changes){
+    const paras = [aiParaCurrent(S), aiParaChange(S), aiParaPair(S), aiParaContext(S), aiParaOutlook(S)];
+    if (changes && changes.length > 0) paras[1].unshift(changes[0]);
+    // 同じ観測が複数の段落に出ないよう、文の先頭で重複を落とす。
+    // （同じことを言い換えて長さを稼がないための担保でもある）
+    const seen = new Set();
+    const dedup = arr => arr.filter(t => {
+      if (!t) return false;
+      const key = t.slice(0, 24);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    let texts = paras.map(p => dedup(p).join('')).filter(t => t.length > 0);
+    if (texts.length === 0) return [];
+
+    // 500文字に満たなければ、未使用の事実を足して厚みを出す
+    const reserve = aiReserveObservations(S, texts.join(''));
+    let guard = 0;
+    while (texts.join('').length < 500 && reserve.length > 0 && guard++ < 10){
+      const item = reserve.shift();
+      const idx = Math.min(item.para - 1, texts.length - 1);
+      texts[idx] += item.text;
+    }
+    return texts;
+  }
+
+  function buildAiInsightCards(S, changes){
+    const cards = [];
+    const m = S.mood, a = S.anxiety;
+    const q = m ? quadrantState(m.latest.v, a ? a.latest.v : null,
+      m.avg30 != null ? m.avg30 : m.avgAll,
+      a ? (a.avg30 != null ? a.avg30 : a.avgAll) : null) : null;
+
+    if (q){
+      // ラベルだけだと「普段の範囲」で終わってしまうことがあるので、
+      // いま効いている動きを一言添えて、状態が一言で掴めるようにする。
       let extra = '';
-      if (other.haveRecent && !other.changed){
-        extra = primary.metric === 'anxiety'
-          ? '気分は保たれたままであるため、現在の状態は気分の落ち込みというより、不安の高まりが続いている状態として捉える方が、今回の記録には合っています。'
-          : '不安は大きく変化していないため、今回の気分の変化は、不安の高まりを伴わない形で起きていると考えられます。';
-      }
-      const levelWord = primary.metric === 'anxiety' ? '不安の強さ' : '気分の低さ';
-      return `今後は、${levelWord}そのものよりも、この状態が数日で戻るのか、さらに持続するのかを中心に見ていくことが重要です。${extra}`;
+      if (a && a.runUp >= 2) extra = '。ただし不安は上がり続けています';
+      else if (m && m.runUp >= 2) extra = '。回復方向の動きが出ています';
+      else if (m && m.runDown >= 2) extra = '。下向きの流れが続いています';
+      else if (m && m.sd7 != null && m.sd7 >= 1) extra = '。ただし記録ごとの揺れは大きめです';
+      else if (a && a.recentSpikes.length > 0) extra = '。ただし直近1週間に不安が急に動いた場面があります';
+      else if (m && m.sd14 != null && m.sdPrior14 != null && m.sd14 - m.sdPrior14 >= 0.4) extra = '。ただし振れ幅は以前より広がっています';
+      else if (S.pair.decoupled > S.pair.coupled) extra = '。気分と不安は別々に動いています';
+      const label = q.key === 'neutral' ? '全体としては普段の範囲' : q.label;
+      cards.push({ label:'今の状態', text: label + extra });
     }
-    return `今後は、${primary.label}に今回のような変化がもう数日続くかどうかを見ていくことが重要です。単発の変化なのか、持続する変化なのかで、捉え方が変わってきます。`;
+
+    const changeText = (changes && changes[0]) || aiChangeHighlight(S);
+    if (changeText) cards.push({ label:'AIが見つけた変化', text: changeText });
+
+    const factor = aiFactorHighlight(S);
+    if (factor) cards.push({ label:'関連していそうな要因', text: factor });
+
+    const good = aiGoodSigns(S);
+    if (good.length > 0) cards.push({ label:'良い兆候', text: good[0] });
+
+    const f = aiForecast(S);
+    if (f) cards.push({ label:'短期予測', text: f });
+
+    const w = aiWatchPoints(S);
+    if (w.length > 0) cards.push({ label:'次に注目するポイント', list: w });
+
+    return cards;
   }
 
-  function computeExecutiveSummary(){
-    if (moods.length < MIN_SAMPLE) return null;
-    const now = Date.now();
-
-    const recent7 = moods.filter(m => m.ts >= now - 7*DAY_MS);
-    const prior7  = moods.filter(m => m.ts >= now - 14*DAY_MS && m.ts < now - 7*DAY_MS);
-    const last30  = moods.filter(m => m.ts >= now - 30*DAY_MS);
-    const prior30 = moods.filter(m => m.ts >= now - 60*DAY_MS && m.ts < now - 30*DAY_MS);
-    const last90  = moods.filter(m => m.ts >= now - 90*DAY_MS);
-    const have90dExtra = last90.length >= last30.length + MIN_SAMPLE; // 30日と同じ集合なら触れない
-
-    const periods = { recent7, prior7, last30, prior30, last90, have90dExtra, MEANINGFUL: 0.3, SD_MEANINGFUL: 0.4 };
-    const moodSig = buildMetricSignal('mood', periods);
-    const anxietySig = buildMetricSignal('anxiety', periods);
-    if (!moodSig.haveRecent && !anxietySig.haveRecent) return null;
-
-    const candidates = [moodSig, anxietySig].filter(s => s.haveRecent);
-    candidates.sort((a,b) => b.score - a.score);
-    const primary = candidates[0] || null;
-
-    // 段落1: 現在の状態
-    const p1 = [
-      execLevelSentence(recent7, moodSig, anxietySig),
-      execWeekTrendSentence(moodSig, anxietySig, periods.MEANINGFUL),
-      execBaselineSentence(moodSig, anxietySig, periods.MEANINGFUL),
-    ].filter(Boolean).join('');
-
-    // 段落2: 専門的な解釈
-    const p2Clauses = [execHeadlineSentence(primary)];
-    if (primary && (primary.changed || primary.sdChanged)){
-      p2Clauses.push('精神科・心療内科で経過を見る場合、1回だけの数値の高さよりも、本人の普段の状態（ベースライン）からどの程度変化し、それがどの程度続いているかを重視します。');
+  function aiChangeHighlight(S){
+    const m = S.mood, a = S.anxiety;
+    if (S.pair.lead === 'anxiety') return '最近は、気分より不安のほうが先に変化しています。';
+    if (a && a.runUp >= 2) return `不安が${a.runUp + 1}回続けて上がっており、単発ではなく流れになっています。`;
+    if (m && m.runDown >= 2) return `気分が${m.runDown + 1}回続けて下がっています。`;
+    if (m && m.runUp >= 2) return `気分が${m.runUp + 1}回続けて上がっています。`;
+    if (m && m.sd14 != null && m.sdPrior14 != null && Math.abs(m.sd14 - m.sdPrior14) >= 0.4){
+      return `平均値は大きく変わらない一方で、記録ごとの振れ幅が以前より${m.sd14 > m.sdPrior14 ? '大きく' : '小さく'}なっています。`;
     }
-    p2Clauses.push(execPersistenceClause(primary));
-    p2Clauses.push(execVariabilityClause(primary));
-    p2Clauses.push(execDivergenceClause(moodSig, anxietySig));
-    const p2 = p2Clauses.filter(Boolean).join('');
-
-    // 段落3: データの背景・文脈
-    const p3 = execContextParagraph(primary, moodSig, anxietySig);
-
-    // 段落4: ひとことメモ（フリーコメント）の分析
-    const p4 = execCommentReportParagraph();
-
-    // 段落5: 今後見るべきポイント
-    const p5 = execWatchParagraph(primary, moodSig, anxietySig);
-
-    const parts = [p1, p2, p3, p4, p5].filter(Boolean);
-    if (parts.length === 0) return null;
-    return { parts, note: EXEC_SUMMARY_NOTE_ANALYSIS };
+    if (m && m.recentDayRange != null && m.olderDayRange != null && Math.abs(m.recentDayRange - m.olderDayRange) >= 0.7){
+      return `同じ日の中での上下が、以前より${m.recentDayRange > m.olderDayRange ? '大きく' : '小さく'}なっています。`;
+    }
+    if (m && m.avg7 != null && m.avg30 != null && Math.abs(m.avg7 - m.avg30) >= 0.3){
+      return `この1週間は、普段の落ち着きどころより${m.avg7 > m.avg30 ? '良いほう' : '重いほう'}に寄っています。`;
+    }
+    return null;
   }
 
-  function renderExecutiveSummary(){
-    const summary = computeExecutiveSummary();
-    if (!summary){
+  function aiFactorHighlight(S){
+    const C = S.comments;
+    if (C && C.splitByTheme.length > 0){
+      const x = C.splitByTheme[0];
+      return `「${x.theme}」は、自分で進められた場面と、指摘や予定外など止めにくい場面とで結果が分かれています。`;
+    }
+    if (C && C.situations.length > 0){
+      const hit = C.situations.find(s => s.n >= 2 && s.anxDelta != null && s.anxDelta >= 0.5);
+      if (hit) return `メモに「${hit.key}」が書かれた${hit.n}件では、不安がいつもより高く出ています。`;
+      const good = C.situations.find(s => s.n >= 2 && s.moodDelta != null && s.moodDelta >= 0.5);
+      if (good) return `メモに「${good.key}」が書かれた${good.n}件では、気分がいつもより高く出ています。`;
+    }
+    const a = S.anxiety;
+    if (a){
+      const tod = strongestBucket(a.byTod, 'anxiety');
+      if (tod) return `${tod.k}（${TOD_BUCKET_HOURS[tod.k]}）の記録で不安が${tod.diff > 0 ? '高め' : '低め'}に出ています。`;
+      const wd = strongestWeekday(a.byWeekday, 'anxiety');
+      if (wd) return `${WEEKDAYS_JA[wd.i]}曜日の記録で不安が${wd.diff > 0 ? '高め' : '低め'}に出ています。`;
+    }
+    if (C && C.coincidences.length > 0){
+      const c = C.coincidences[0];
+      return `不安が急に上がったタイミングと、${c.situations.length ? `「${c.situations[0]}」の` : ''}メモの時刻が一致しています（まだ1例です）。`;
+    }
+    return null;
+  }
+
+  /* ---- 表示 ---- */
+  function computeAiAnalysis(){
+    if (moods.length === 0) return null;
+    const S = buildAnalysisStats();
+    if (!S.mood) return null;
+    const sig = analysisSignature(S);
+    const prevState = loadAnalysisState();
+    let changes = [];
+    if (prevState && prevState.sig && prevState.sig.latestTs && prevState.sig.latestTs !== sig.latestTs){
+      changes = detectChanges(prevState.sig, sig, S);   // 新しい記録が入ったときだけ計算
+    } else if (prevState && Array.isArray(prevState.changes)){
+      changes = prevState.changes;                      // データが同じなら前回の気づきを保つ
+    }
+    const notice = buildNotice(S, changes);
+    saveAnalysisState({ sig, changes, savedAt: Date.now() });
+    return { stats:S, changes, notice, paragraphs: composeAiAnalysis(S, changes), cards: buildAiInsightCards(S, changes) };
+  }
+
+  function renderAiAnalysis(){
+    const result = computeAiAnalysis();
+    if (!result || result.paragraphs.length === 0){
+      aiNoticeCardEl.hidden = true;
       execSummaryCardEl.hidden = true;
+      aiInsightGridEl.innerHTML = '';
       return;
     }
+    aiNoticeCardEl.hidden = false;
+    aiNoticeTextEl.textContent = result.notice;
+
     execSummaryCardEl.hidden = false;
     execSummaryTextEl.innerHTML = '';
-    summary.parts.forEach(text => {
+    result.paragraphs.forEach(text => {
       const p = document.createElement('p');
       p.textContent = text;
       execSummaryTextEl.appendChild(p);
     });
-    execSummaryNoteEl.textContent = summary.note;
+    execSummaryNoteEl.textContent = AI_ANALYSIS_NOTE;
+
+    aiInsightGridEl.innerHTML = '';
+    result.cards.forEach((card, i) => {
+      const el = document.createElement('div');
+      el.className = 'insight-item anim-fade-up';
+      el.style.animationDelay = `${i * 60}ms`;
+      const label = document.createElement('div');
+      label.className = 'insight-label';
+      label.textContent = card.label;
+      el.appendChild(label);
+      if (card.list){
+        const ul = document.createElement('ul');
+        ul.className = 'insight-list';
+        card.list.forEach(t => {
+          const li = document.createElement('li');
+          li.textContent = t;
+          ul.appendChild(li);
+        });
+        el.appendChild(ul);
+      } else {
+        const body = document.createElement('div');
+        body.className = 'insight-body';
+        body.textContent = card.text;
+        el.appendChild(body);
+      }
+      aiInsightGridEl.appendChild(el);
+    });
   }
 
   function renderAnalysis(){
-    renderExecutiveSummary();
+    renderAiAnalysis();
     renderRecentCard();
     updateTrendChart();
     renderFindings();
